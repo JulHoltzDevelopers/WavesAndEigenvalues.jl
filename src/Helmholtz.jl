@@ -9,7 +9,7 @@ import ..Meshutils: get_line_idx
 import ..NLEVP: generate_1_gz
 include("Meshutils_exports.jl")
 include("NLEVP_exports.jl")
-include("shape_sensitivity.jl")
+#include("shape_sensitivity.jl")
 include("Bloch.jl")
 export discretize
 ##
