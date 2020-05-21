@@ -164,6 +164,6 @@ function find_smplx(list,smplx)
     if ins
         return idx
     else
-        return nothing
+        return 0
     end
 end

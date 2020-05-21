@@ -81,12 +81,14 @@ function householder(L,z;maxiter=10,tol=0.,relax=1.,lam_tol=0.,order=1,n_eig_val
     if v0==[]
         v0=ones(ComplexF64,size(L(0))[1])
         v0_adj=ones(ComplexF64,size(L(0))[1])
-    #TODO: Inititialize adjoint
+    else
+        #TODO: Inititialize adjoint
+        v0_adj=v0
     end
 
     flag=1
     try
-        while abs(z-z0)>tol && n<maxiter
+        while abs(z-z0)>tol && n<maxiter #TODO: include lam_tol here to avoid slow convergenvce terminations
             if output; println(n,"\t\t",abs(lam),"\t",abs(z-z0),"\t", z );flush(stdout); end
             z0=z
             L.params[L.eigval]=z

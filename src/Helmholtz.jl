@@ -2,10 +2,15 @@
 Module providing functionality to numerically discretize the (thermoacoustic) Helmholtz equation by first and second-order finite elements.
 """
 module Helmholtz
-import SparseArrays
-using ..Meshutils, ..NLEVP
+import SparseArrays, LinearAlgebra, ProgressMeter
+import FFTW: fft
+using ..Meshutils, ..NLEVP #TOOOcheck where find_smplx is introduced to scope
+import ..Meshutils: get_line_idx
+import ..NLEVP: generate_1_gz
 include("Meshutils_exports.jl")
 include("NLEVP_exports.jl")
+include("shape_sensitivity.jl")
+include("Bloch.jl")
 export discretize
 ##
 function outer(ii,aa,jj,bb)
@@ -26,59 +31,6 @@ end
 
 
 
-function blochify(ii,jj,mm, naxis,nsector; axis = true)
-    #nsector=naxis+nxbloch+nbody+nxsymmetry+nbody
-    blochshift=nsector-naxis
-    MM=ComplexF64[]
-    MM_plus=ComplexF64[]
-    MM_minus=ComplexF64[]
-    II=UInt32[]
-    JJ=UInt32[]
-    II_plus=UInt32[]#TODO: consider preallocation
-    JJ_plus=UInt32[]
-    II_minus=UInt32[]
-    JJ_minus=UInt32[]
-    #println("$(length(ii)) $(length(jj)) $(length(mm))")
-    for (i,j,m) in zip(ii,jj,mm)
-        #TODO: Hier eine if abfrage ob dof <= npoints dann kann man die lines gesondert behandeln.
-        i_check = i>nsector
-        j_check = j>nsector
-
-        # map Bloch_ref to Bloch_img
-        if i_check
-            i-=blochshift
-        end
-        if j_check
-            j-=blochshift
-        end
-
-        if axis &&( i<=naxis || j<=naxis) &&  !(i<=naxis && j<=naxis)
-            m=0
-        end
-
-        if (!i_check && !j_check) || (i_check && j_check) #no manipulation of matrix entries
-            append!(II,i)
-            append!(JJ,j)
-            append!(MM,m)
-
-        elseif !i_check && j_check
-            append!(II_plus,i)
-            append!(JJ_plus,j)
-            append!(MM_plus,m)
-
-        elseif i_check && !j_check
-            append!(II_minus,i)
-            append!(JJ_minus,j)
-            append!(MM_minus,m)
-        else
-            println("ERROR: in blochification")
-            return
-        end
-    end
-
-    #println("Here:::",length(II)," ", length(JJ)," ", length(MM))
-    return (II,II_plus,II_minus), (JJ,JJ_plus,JJ_minus), (MM, MM_plus, MM_minus)
-end
 
 
 ##
@@ -101,50 +53,68 @@ import .quad
 import .quad20
 
 """
-    L=discretize(mesh, dscrp, C; el_type=1, c_type=0, b=:__none__)
+    L=discretize(mesh, dscrp, C; el_type=1, c_type=0, b=:__none__, mass_weighting=true)
 
 Discretize the Helmholtz equation using the mesh `mesh`.
 
 # Arguments
 - `mesh::Mesh`: tetrahedral mesh
 - `dscrp::Dict `: dictionary containing information on where to apply physical constraints. Such as standard wave propagation, boundary conditions, flame responses, etc.
-- `C:Array`: array defining the speed of sound. If "c_type==0" the speed of sound is constant along one tetrahedron and `length(C)==length(mesh.tetrahedra)`. If `c_type==1` the speed of sound is linearly interpolated between the vertices of the mesh and `length(C)==size(mesh.points,2)`.
-- `eltype = 1`: optional paramater to select between first (`eltype==1` the default) and second order (`eltype==2`) finite elements.
+- `C:Array`: array defining the speed of sound. If `c_type==0` the speed of sound is constant along one tetrahedron and `length(C)==length(mesh.tetrahedra)`. If `c_type==1` the speed of sound is linearly interpolated between the vertices of the mesh and `length(C)==size(mesh.points,2)`.
+- `el_type = 1`: optional paramater to select between first (`el_type==1` the default) and second order (`el_type==2`) finite elements.
 - `c_type = 1`: optional parameter controlling whether speed of sound is constant on a tetrahedron or linearly interpolated between vertices.
-- `b::Symbol=:__none__`: optional parameter defining the Bloch wave number. If `b=:__none__` (the default) noch Blochwave formalism is applied.
+- `b::Symbol=:__none__`: optional parameter defining the Bloch wave number. If `b=:__none__` (the default) no Blochwave formalism is applied.
+- `mass_weighting=true`: optional parameter if true mass matrix is used as weighting matrix for householder, otherwise this matrix is not set.
 
 # Returns
 - `L::LinearOperatorFamily`: parametereized discretization of the specified Helmholtz equation.
 """
-function discretize(mesh::Mesh, dscrp, C; el_type=1, c_type=0, b=:__none__)
+function discretize(mesh::Mesh, dscrp, C; el_type=1, c_type=0, b=:__none__, mass_weighting=true)
     if el_type==1 && c_type==0
-        println("using linear finite elements and locally constant speed of sound")
+        #println("using linear finite elements and locally constant speed of sound")
         assemble_volume_source, assemble_gradient_source, assemble_mass_operator, assemble_stiffness_operator, assemble_boundary_mass_operator =lin.assemble_volume_source, lin.assemble_gradient_source, lin.assemble_mass_operator, lin.assemble_stiffness_operator, lin.assemble_boundary_mass_operator
     elseif el_type==2 && c_type==0
-        println("using linear finite elements and locally constant speed of sound")
+        #println("using linear finite elements and locally constant speed of sound")
         assemble_volume_source, assemble_gradient_source, assemble_mass_operator, assemble_stiffness_operator, assemble_boundary_mass_operator =quad20.assemble_volume_source, quad20.assemble_gradient_source, quad20.assemble_mass_operator, quad20.assemble_stiffness_operator, quad20.assemble_boundary_mass_operator
     elseif el_type==2 && c_type==1
-        println("using quadratic finite elements and locally linear speed of sound")
-                assemble_volume_source, assemble_gradient_source, assemble_mass_operator, assemble_stiffness_operator, assemble_boundary_mass_operator =quad.assemble_volume_source, quad.assemble_gradient_source, quad.assemble_mass_operator, quad.assemble_stiffness_operator, quad.assemble_boundary_mass_operator
+        #println("using quadratic finite elements and locally linear speed of sound")
+        assemble_volume_source, assemble_gradient_source, assemble_mass_operator, assemble_stiffness_operator, assemble_boundary_mass_operator =quad.assemble_volume_source, quad.assemble_gradient_source, quad.assemble_mass_operator, quad.assemble_stiffness_operator, quad.assemble_boundary_mass_operator
     else
         println("ERROR: Elements not supported!")
         return
     end
 
-
     L=LinearOperatorFamily(["ω","λ"],complex([0.,Inf]))
-    dim=size(mesh.points)[2]
+    N_points=size(mesh.points)[2]
+    dim=deepcopy(N_points)
+    #Prepare Bloch wave analysis
     if b!=:__none__
         bloch=true
-        naxis=mesh.dos[2]
-        nsector=naxis+mesh.dos[3]+2*mesh.dos[4]+mesh.dos[5]#naxis+nxbloch+nbody+nxsymmetry+nbody
-        Δϕ=2*pi/mesh.dos[1]
+        naxis=mesh.dos.naxis
+        nxbloch=mesh.dos.nxbloch
+        nsector=naxis+mesh.dos.nxsector
+        naxis_ln=mesh.dos.naxis_ln+N_points
+        nsector_ln=mesh.dos.naxis_ln+mesh.dos.nxsector_ln+N_points
+        Δϕ=2*pi/mesh.dos.DOS
         exp_plus(z,k)=exp_az(z,Δϕ*1.0im,k) #check whether this is a closure
         exp_minus(z,k)=exp_az(z,-Δϕ*1.0im,k)
-        txt_plus="*exp(i$(b)2π/$(mesh.dos[1]))"
-        txt_minus="*exp(-i$(b)2π/$(mesh.dos[1]))"
+        bloch_filt=zeros(ComplexF64,mesh.dos.DOS)
+        bloch_filt[1]=(1.0+0.0im)/mesh.dos.DOS
+        bloch_filt=fft(bloch_filt)
+        bloch_filt=generate_Σy_exp_ikx(bloch_filt)
+        anti_bloch_filt=generate_1_gz(bloch_filt)
+        bloch_exp_plus=generate_gz_hz(bloch_filt,exp_plus)
+        bloch_exp_minus=generate_gz_hz(bloch_filt,exp_minus)
+        txt_plus="*exp(i$(b)2π/$(mesh.dos.DOS))"
+        txt_minus="*exp(-i$(b)2π/$(mesh.dos.DOS))"
+        txt_filt="*δ($b)"
+        txt_filt_plus=txt_filt*txt_plus
+        txt_filt_minus=txt_filt*txt_minus
+        #txt_filt="*1($b)"
+        #bloch_filt=pow0
         L.params[b]=0.0+0.0im
-        dim-=mesh.dos[3]
+        dim-=mesh.dos.nxbloch
+        #N_points_dof=N_points-mesh.dos.nxbloch
     else
         bloch=false
         naxis=nsector=0
@@ -153,28 +123,30 @@ function discretize(mesh::Mesh, dscrp, C; el_type=1, c_type=0, b=:__none__)
 
     #aggregator to create local elements ( tetrahedra, triangles)
     if el_type==2
-        N_points=UInt32(dim)
-        dim+=size(mesh.lines)[1] #TODO: check for bloch
         triangles=Array{UInt32,1}[] #TODO: preallocation?
         tetrahedra=Array{UInt32,1}[]
         tet=Array{UInt32}(undef,10)
         tri=Array{UInt32}(undef,6)
         for (idx,smplx) in enumerate(mesh.tetrahedra) #TODO: no enumeration
             tet[1:4]=smplx[:]
-            tet[5]=find_smplx(mesh.lines,smplx[[1,2]])+N_points #TODO: type stability
-            tet[6]=find_smplx(mesh.lines,smplx[[1,3]])+N_points
-            tet[7]=find_smplx(mesh.lines,smplx[[1,4]])+N_points
-            tet[8]=find_smplx(mesh.lines,smplx[[2,3]])+N_points
-            tet[9]=find_smplx(mesh.lines,smplx[[2,4]])+N_points
-            tet[10]=find_smplx(mesh.lines,smplx[[3,4]])+N_points
+            tet[5]=get_line_idx(mesh,smplx[[1,2]])+N_points#find_smplx(mesh.lines,smplx[[1,2]])+N_points #TODO: type stability
+            tet[6]=get_line_idx(mesh,smplx[[1,3]])+N_points
+            tet[7]=get_line_idx(mesh,smplx[[1,4]])+N_points
+            tet[8]=get_line_idx(mesh,smplx[[2,3]])+N_points
+            tet[9]=get_line_idx(mesh,smplx[[2,4]])+N_points
+            tet[10]=get_line_idx(mesh,smplx[[3,4]])+N_points
             push!(tetrahedra,copy(tet))
         end
         for (idx,smplx) in enumerate(mesh.triangles)
             tri[1:3]=smplx[:]
-            tri[4]=find_smplx(mesh.lines,smplx[[1,2]])+N_points
-            tri[5]=find_smplx(mesh.lines,smplx[[1,3]])+N_points
-            tri[6]=find_smplx(mesh.lines,smplx[[2,3]])+N_points
+            tri[4]=get_line_idx(mesh,smplx[[1,2]])+N_points
+            tri[5]=get_line_idx(mesh,smplx[[1,3]])+N_points
+            tri[6]=get_line_idx(mesh,smplx[[2,3]])+N_points
             push!(triangles,copy(tri))
+        end
+        dim+=size(mesh.lines)[1]
+        if bloch
+            dim-=mesh.dos.nxbloch_ln
         end
 
     elseif el_type==1
@@ -184,7 +156,9 @@ function discretize(mesh::Mesh, dscrp, C; el_type=1, c_type=0, b=:__none__)
 
     if c_type==0
         C_tet=C
-        link_triangles_to_tetrahedra!(mesh)
+        if mesh.tri2tet[1]==0xffffffff
+            link_triangles_to_tetrahedra!(mesh)
+        end
         C_tri=C[mesh.tri2tet]
     elseif c_type==1
         C_tet=Array{UInt32,1}[] #TODO: Preallocation
@@ -204,12 +178,28 @@ function discretize(mesh::Mesh, dscrp, C; el_type=1, c_type=0, b=:__none__)
 
         elseif type==:admittance
             make=[:C]
-            adm_sym,adm_val=data
-            adm_txt="ω*"*string(adm_sym)
-            if adm_sym ∉ keys(L.params)
-                L.params[adm_sym]=adm_val
-            end
+            if length(data)==2
+                adm_sym,adm_val=data
 
+                adm_txt="ω*"*string(adm_sym)
+                if adm_sym ∉ keys(L.params)
+                    L.params[adm_sym]=adm_val
+                end
+                boundary_func=(pow1,pow1,)
+                boundary_arg=((:ω,),(adm_sym,),)
+                boundary_txt=adm_txt
+            elseif length(data)==1
+                boundary_func=(generate_z_g_z(data[1]),)
+                boundary_arg=((:ω,),)
+                boundary_txt="ω*Y(ω)"
+            elseif length(data)==4
+                Ass,Bss,Css,Dss = data
+                adm_txt="ω*C_s(iωI-A)^{-1}B"
+                func_z_stsp = generate_z_g_z(generate_stsp_z(Ass,Bss,Css,Dss))
+                boundary_func=(func_z_stsp,)
+                boundary_arg=((:ω,),)
+                boundary_txt=adm_txt
+            end
 
         elseif type==:flame
             make=[:Q]
@@ -273,9 +263,9 @@ function discretize(mesh::Mesh, dscrp, C; el_type=1, c_type=0, b=:__none__)
             elseif opr==:C
                 I,J,V=assemble_boundary_mass_operator(mesh.points,triangles[mesh.domains[domain]["simplices"]],C_tri[mesh.domains[domain]["simplices"]])
                 V*=-1im
-                func=(pow1,pow1,)
-                arg=((:ω,),(adm_sym,),)
-                txt=adm_txt
+                func=boundary_func # func=(pow1,pow1,)
+                arg=boundary_arg  # arg=((:ω,),(adm_sym,),)
+                txt=boundary_txt  # txt=adm_txt
                 mat="C"
             elseif opr==:Q
                 I,S=assemble_volume_source(mesh.points,tetrahedra[mesh.domains[domain]["simplices"]])
@@ -291,7 +281,7 @@ function discretize(mesh::Mesh, dscrp, C; el_type=1, c_type=0, b=:__none__)
             end
 
             if bloch
-                for (i,j,v,f,a,t) in zip(blochify(I,J,V,naxis,nsector)...,[(),(exp_plus,),(exp_minus,)],[(), ((b,),), ((b,),)], ["", txt_plus, txt_minus])
+                for (i,j,v,f,a,t) in zip(blochify(I,J,V,naxis,nxbloch,nsector,naxis_ln,nsector_ln,N_points)...,[(),(exp_plus,),(exp_minus,),(bloch_filt,),(bloch_exp_plus,),(bloch_exp_minus,),],[(), ((b,),), ((b,),),((b,),),((b,),),((b,),),], ["", txt_plus, txt_minus, txt_filt, txt_filt_plus, txt_filt_minus,])
                     M =SparseArrays.sparse(i,j,v,dim,dim)
                     push!(L,Term(M,(func...,f...),(arg...,a...),txt*t,mat))
                 end
@@ -304,15 +294,45 @@ function discretize(mesh::Mesh, dscrp, C; el_type=1, c_type=0, b=:__none__)
         end
     end
 
-    I,J,V=assemble_mass_operator(mesh.points,tetrahedra)
+
+    if mass_weighting||bloch
+        I,J,V=assemble_mass_operator(mesh.points,tetrahedra)
+    end
     if bloch
-        IJV=blochify(I,J,V,naxis,nsector,axis=false)#TODO check whether this matrix needs more blochfication... especially because tetrahedra is not periodic
+
+        #TODO: implement switch to select weighting matrix
+
+        IJV=blochify(I,J,V,naxis,nxbloch,nsector,naxis_ln,nsector_ln,N_points,axis=false)#TODO check whether this matrix needs more blochfication... especially because tetrahedra is not periodic
         I=[IJV[1][1]..., IJV[1][2]..., IJV[1][3]...]
         J=[IJV[2][1]..., IJV[2][2]..., IJV[2][3]...]
         V=[IJV[3][1]..., IJV[3][2]..., IJV[3][3]...]
+        M=SparseArrays.sparse(I,J,-V,dim,dim)
+
+        if 0<naxis #modify axis dof for essential boundary condition when blochwave number !=0
+            DI=1:naxis
+            DV=ones(ComplexF64,naxis) #TODO: make this more compact
+            if el_type==2
+                DI=vcat(DI,(N_points+1:naxis_ln).-nxbloch)
+                DV=vcat(DV,ones(ComplexF64,naxis_ln-N_points))
+            end
+            for idx=1:naxis
+                DV[idx]=1/M[idx,idx]
+            end
+            if el_type==2
+                for (idx,ii) in enumerate((N_points+1:naxis_ln).-nxbloch)
+                    DV[idx+naxis]=1/M[ii,ii]
+                end
+            end
+            DM=SparseArrays.sparse(DI,DI,DV,dim,dim)
+            push!(L,Term(DM,(anti_bloch_filt,),((:b,),),"(1-δ(b))","D"))
+        end
     end
-    M=SparseArrays.sparse(I,J,-V,dim,dim)
+
+    if mass_weighting&&!bloch
+        M=SparseArrays.sparse(I,J,-V,dim,dim)
+    end
     push!(L,Term(M,(pow1,),((:λ,),),"-λ","__aux__"))
+
     return L
 end
 end#module

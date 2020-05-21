@@ -2,8 +2,47 @@
 Module containing functionality to read and process tetrahedral meshes from gmsh.
 """
 module Meshutils
-import LinearAlgebra
+import LinearAlgebra, ProgressMeter
 include("Meshutils_exports.jl")
+
+"""
+Simple struct element to store additional information on symmetry for rotational symmetric meshes.
+
+#Fields
+- `DOS::Int64`: degree of symmetry
+- `naxis::Int64`: number of grid points lying on the center axis
+- `nxbloch::Int64`: number of grid points lying on the Bloch plane but not on the center axis
+- `nbody::Int64`: number of interior points in half cell
+- `shiftbody::Int64`: difference from body point to reflected body point
+- `nxsymmetry::Int64`: number of grid points on symmetry plane (without center axis)
+- `nxsector::Int64`: number of grid points belonging to a unit cell (without cenetraxis, Bloch and Bloch image plane)
+- `naxis_ln::Int64`: number of line segments lying on the center axis
+- `nxbloch_ln::Int64`: number of line segments belonging to a unit cell (without cenetraxis, Bloch and Bloch image plane)
+- `nxsector_ln::Int64`: number of line segments belonging to a unit cell (without cenetraxis, Bloch and Bloch image plane)
+- `nxsector_tri::Int64`: number of surface triangles belonging to a unit cell (without Bloch and Bloch image plane)
+- `nxsector_tet::Int64`: number of tetrahedra of a unit cell
+- `n`: unit axis vector of the center axis
+- `pnt: foot point of the center axis
+- `unit::Bool`: true if mesh represents only a unit cell
+"""
+struct SymInfo
+    DOS::Int64 #degree of symmetry
+    naxis::Int64 #number of gridpoints lying on the centeraxis
+    nxbloch::Int64
+    nbody::Int64
+    shiftbody::Int64
+    nxsymmetry::Int64
+    nxsector::Int64
+    naxis_ln::Int64
+    nxbloch_ln::Int64
+    nxsector_ln::Int64
+    nxsector_tri::Int64
+    nxsector_tet::Int64
+    n
+    pnt
+    unit::Bool
+end
+
 
 """
 Definition of the mesh type
@@ -20,10 +59,10 @@ Definition of the mesh type
 - `dos`: special field meant to contain symmetry information of highly symmetric meshes.
 
 # Notes
-The meshes are supposed to be tetrahedral. All simplices (lines, triangles, and tetrahedra) are stored as list of simplices.
+The meshes are supposed to be tetrahedral. All simplices (lines, triangles, and tetrahedra) are stored as lists of simplices.
 Simplices are lists of integers containing the indices of the points (i.e. the column number in the `points` array) forming the simplex.
-This means a line is a two-entry list, a triangle a three-entry list, and a tetrahedron a four entry lists.
-For convenience certain entities of the mesh can be further defined in the `domains`dictionary. Each key defines a domain and maps to another dictionary.
+This means a line is a two-entry list, a triangle a three-entry list, and a tetrahedron a four-entry list.
+For convenience certain entities of the mesh can be further defined in the `domains` dictionary. Each key defines a domain and maps to another dictionary.
 This second-level dictionary contains at least two keys: `"dimension"` mapping to the dimension of the specified domain (1,2, or 3) and
 `"simplices"` containing a list of integers mapping into the respective simplex lists. More keys may be added to the dictionary to
 define additional and/or custom information on the domain. For instance the `compute_volume!` function adds an entry with the domain size.
@@ -91,8 +130,8 @@ function Mesh(file_name::String;scale=1)
         unique!(domains[dom]["simplices"])
     end
 
-
     tri2tet=zeros(UInt32,length(utriangles))
+    tri2tet[1]=0xffffffff #magic sentinel value to check whether list is linked
     Mesh(file_name, points*scale, ulines, utriangles, utetrahedra, domains, file_name,tri2tet,1)
 end
 
@@ -430,21 +469,27 @@ end
 Find the tetrahedra that are connected to the triangles in mesh.triangles and store this information in mesh.tri2tet.
 """
 function link_triangles_to_tetrahedra!(mesh::Mesh)
-    for (idx,tri) in enumerate(mesh.triangles)
-        for (idt::UInt32,tet) in enumerate(mesh.tetrahedra)
-            if all([i in tet for i=tri])
+    for (idt,tet) in enumerate(mesh.tetrahedra)
+        for tri in (tet[[1,2,3]],tet[[1,2,4]],tet[[1,3,4]],tet[[2,3,4]])
+            idx,ins=sort_smplx(mesh.triangles,tri)
+            if !ins
                 mesh.tri2tet[idx]=idt
-                break
             end
         end
     end
-    return
+    return nothing
 end
-
-
-
-
-
+# function link_triangles_to_tetrahedra!(mesh::Mesh)
+#     for (idx,tri) in enumerate(mesh.triangles)
+#         for (idt::UInt32,tet) in enumerate(mesh.tetrahedra)
+#             if all([i in tet for i=tri])
+#                 mesh.tri2tet[idx]=idt
+#                 break
+#             end
+#         end
+#     end
+#     return
+# end
 
 
 ##
@@ -571,7 +616,207 @@ function unify!(mesh::Mesh ,new_domain::String,domains...)
     sort!(mesh.domains[new_domain]["simplices"])
 end
 
-## legacy functions will be removed in the future
+
+"""
+    surface_points, tri_mask, tet_mask = get_surface_points(mesh::Mesh,output=true)
+
+Get a list `surface_points` of all point indices that are on the surface of the
+mesh `mesh`. The corresponding lists `tri_mask and `tet_mask` contain lists of
+indices of all triangles and tetrahedra that are connected to the surface
+point. The optional parameter `output` toggles whether a progressbar should be
+shown or not.
+"""
+function get_surface_points(mesh::Mesh,output::Bool=true)
+    #TODO put return values as fields into Mesh
+    #step #1 find all points on the surface
+    surface_points=[]
+    #intialize progressbar
+    if output
+        p = ProgressMeter.Progress(length(mesh.triangles),desc="Find points #1... ", dt=1,
+             barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),
+             barlen=20)
+    end
+    for tri in mesh.triangles
+        for pnt in tri
+            insert_smplx!(surface_points,pnt)
+        end
+        #update progressbar
+        if output
+            ProgressMeter.next!(p)
+        end
+    end
+
+    #step 2 link points to simplices
+    #tri_mask=Array{Int64,1}[]
+    #tet_mask=Array{Int64,1}[]
+    tri_mask=[[] for idx = 1:length(surface_points)]
+    tet_mask=[[] for idx = 1:length(surface_points)]
+    #intialize progressbar
+    if output
+        p = ProgressMeter.Progress(length(mesh.triangles),desc="Link to triangles... ", dt=1,
+             barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),
+             barlen=20)
+    end
+
+    for (tri_idx,tri) in enumerate(mesh.triangles)
+        for pnt_idx in tri
+            idx=find_smplx(surface_points,pnt_idx)
+            if idx>0
+                append!(tri_mask[idx],tri_idx)
+            end
+        end
+        #update progressbar
+        if output
+            ProgressMeter.next!(p)
+        end
+    end
+    if output
+        p = ProgressMeter.Progress(length(mesh.tetrahedra),desc="Link to tetrahedra... ", dt=1,
+             barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),
+             barlen=20)
+    end
+    for (tet_idx,tet) in enumerate(mesh.tetrahedra)
+        for pnt_idx in tet
+            idx=find_smplx(surface_points,pnt_idx)
+            if idx>0
+                append!(tet_mask[idx],tet_idx)
+            end
+        end
+        #update progressbar
+        if output
+            ProgressMeter.next!(p)
+        end
+    end
+    return surface_points, tri_mask, tet_mask
+end
+# function get_surface_points(mesh::Mesh,output::Bool=true)
+#     #TODO put return values as fields into Mesh
+#     #step #1 find all points on the surface
+#     surface_points=[]
+#     #intialize progressbar
+#     if output
+#         p = ProgressMeter.Progress(length(mesh.triangles),desc="Find points #1... ", dt=1,
+#              barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),
+#              barlen=20)
+#     end
+#     for tri in mesh.triangles
+#         for pnt in tri
+#             insert_smplx!(surface_points,pnt)
+#         end
+#         #update progressbar
+#         if output
+#             ProgressMeter.next!(p)
+#         end
+#     end
+#
+#     #step 2 link points to simplices
+#     tri_mask=Array{Int64,1}[]
+#     tet_mask=Array{Int64,1}[]
+#     #intialize progressbar
+#     if output
+#         p = ProgressMeter.Progress(length(surface_points),desc="Link to simplices... ", dt=1,
+#              barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),
+#              barlen=20)
+#     end
+#     for (idx,pnt_idx) in enumerate(surface_points)
+#         mask=Int64[]
+#         for (tri_idx,tri) in enumerate(mesh.triangles)
+#             if pnt_idx in tri
+#                 append!(mask,tri_idx)
+#             end
+#         end
+#         append!(tri_mask,[mask])
+#         mask=Int64[]
+#         for (tet_idx,tet) in enumerate(mesh.tetrahedra)
+#             if pnt_idx in tet
+#                 append!(mask,tet_idx)
+#             end
+#         end
+#         append!(tet_mask, [mask])
+#         #update progressbar
+#         if output
+#             ProgressMeter.next!(p)
+#         end
+#     end
+#     return surface_points, tri_mask, tet_mask
+# end
+
+"""
+    normal_vectors=get_normal_vectors(mesh::Mesh,output::Bool=true)
+
+Compute a 3×`length(mesh.triangles)` Array containing the outward pointing
+normal vectors of each of the surface triangles of the mesh `mesh`. The vectors
+are not normalised but their norm is twice the area of the corresponding
+triangle. The optional parameter `output` toggles whether a progressbar should be
+shown or not.
+"""
+function get_normal_vectors(mesh::Mesh,output::Bool=true)
+    #TODO put return values as fields into Mesh
+    #initialize progressbar
+    if output
+        p = ProgressMeter.Progress(length(mesh.triangles),desc="Find points #1... ", dt=1,
+             barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),
+             barlen=20)
+    end
+    normal_vectors=Array{Float64}(undef,3,length(mesh.triangles))
+    #Identify points A,B,C, and D that form the tetrahedron connected to the
+    #surface triangle. D is not part of the surface but is inside the body
+    #therefore its positio can be used to find determine the outward direction.
+    for (idx,tri) in enumerate(mesh.triangles)
+        A,B,C=tri
+        tet=mesh.tri2tet[idx]
+        tet=mesh.tetrahedra[tet]
+        D=0
+        for idx in tet
+            if !(idx in tri)
+                D=idx
+                break
+            end
+        end
+        A=mesh.points[:,A]
+        B=mesh.points[:,B]
+        C=mesh.points[:,C]
+        D=mesh.points[:,D]
+        N=LinearAlgebra.cross(A.-C,B.-C) #compute normal vector (length is twice the area of teh surface triangle)
+        N*=sign(LinearAlgebra.dot(N,C.-D))# make normal outward
+        normal_vectors[:,idx]=N
+    end
+    #update progressbar
+    if output
+        ProgressMeter.next!(p)
+    end
+    return normal_vectors
+end
+
+"""
+    generate_field(mesh::Mesh,func,el_type=0)
+
+Generate field from function `func`for mesh `mesh`. The element type is either
+`el_type=0` for field values associated with the mesh tetrahedra or `el_type=1`
+for field values associated with the mesh vertices. The function must accept
+three input arguments corresponding to the three space dimensions.
+"""
+function generate_field(mesh::Mesh,func,el_type=0)
+    #TODO: implement el_type=2
+    if el_type==0
+        field=zeros(Float64,length(mesh.tetrahedra))#*347.0
+        for idx=1:length(mesh.tetrahedra)
+            cntr=sum(mesh.points[:,mesh.tetrahedra[idx]],dims=2)/4 #centerpoint of a tetrahedron is arithmetic mean of the vertices
+            field[idx]=func(cntr...)
+        end
+    else
+        field=zeros(Float64,size(mesh.points,2))
+        for idx in 1:size(mesh.points,2)
+            pnt=mesh.points[:,idx]
+            field[idx]=func(pnt...)
+        end
+    end
+    return field
+end
+
+#################################################
+#! legacy functions will be removed in the future
+#!################################################
 function build_domains!(mesh::Mesh)
     for dom in keys(mesh.domains)
         dim=mesh.domains[dom]["dimension"]

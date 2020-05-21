@@ -36,7 +36,7 @@ function is_point_in_plane(pnt,pln)
     return pln[1]*pnt[1]+pln[2]*pnt[2]+pln[3]*pnt[3]+pln[4]
 end
 """
-    p=reflect_point_at_plane(pnt,pln)
+    p = reflect_point_at_plane(pnt,pln)
 
 Reflect point `pnt` at plane `pln` and return as `p`.
 
@@ -51,7 +51,7 @@ function reflect_point_at_plane(pnt,pln)
     return p
 end
 """
-    foot=find_foot_of_perpendicular(pnt,pln)
+    foot = find_foot_of_perpendicular(pnt,pln)
 
 Compute the position of the foot of the perpendicular from the point `pnt` to the plane `pln`.
 
@@ -131,12 +131,119 @@ function find_testpoint_idx(tri, tet)
     return testpoint_idx
 end
 
-##
+"""
+    ridx = get_rotated_index(idx,sector, naxis, nxsector, DOS)
+
+Get index `ridx` of point in sector `sector` created from rotation of the point
+with index `idx`. The definig mesh feature `naxis` points on the center axis,
+`nxsector` points in a unit cell excluding the center axis, and has a degree of
+symmetry `DOS`.
+"""
+function get_rotated_index(idx,sector, naxis, nxsector, DOS)
+    if idx <= naxis
+        idx=idx
+    else
+        idx=idx+nxsector*sector #sector counting starts from zero
+    end
+    idx=((idx-naxis-1)%(nxsector*DOS))+naxis+1
+    if idx<0
+        idx+=DOS*nxsector
+    end
+
+    return idx
+end
 
 """
-    full_mesh=create_full_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloch", unit=false)
+    ridx = get_reflected_index(idx,naxis,nxbloch,nbody,shiftbody,nxsymmetry)
 
-Create full mesh from half cell represented in `mesh`.
+Get index `ridx` of a point in the first unit cell created from reflection of
+the point with index `idx`. The definig mesh feature `naxis` points on the
+center axis, `nxbloch` points on the bloch plane (excluding the center axis),
+`nbody` points in the interiror of the first half-cell, `nxsymmetry`points on
+the symmetry plane (excluding the center axis) `nxsector` points in a unit cell
+excluding the center axis. The difference of the indeces of a refernce body point
+and a reflected body point is `shiftbody`. The number of points per unit cell
+(excluding the center axis) is `nxsector`.
+"""
+function get_reflected_index(idx,naxis,nxbloch,nbody,shiftbody,nxsymmetry,nxsector)
+    if idx <= naxis
+        idx=idx
+    elseif idx <= naxis+nxbloch
+        idx=idx+nxsector
+    elseif idx <= naxis+nxbloch+nbody
+            idx=idx+shiftbody
+    elseif idx <=  naxis+nxbloch+nbody+nxsymmetry
+        idx=idx
+    else
+        idx=0 #error flag
+    end
+    return idx
+end
+
+"""
+    sector = get_point_sector(pnt_idx,naxis, nxsector)
+
+Get the sector containing point with index `pnt_idx`, in a mesh that features
+`naxis` grid points on the center line and `nxsector` grid points in a unit cell
+excluding the center axis.
+"""
+function get_point_sector(pnt_idx,naxis, nxsector)
+    if pnt_idx<=naxis
+        return typemax(0)
+    else
+        return (pnt_idx-naxis-1)÷nxsector #-1 is necessary because otherwise last point would count to next sector
+    end
+end
+
+"""
+    s = get_line_sector(ln)
+
+Get index `s` of sector containing line `ln`, in a mesh that features
+`naxis` grid points on the center line and `nxsector` grid points in a unit cell
+excluding the center axis..
+"""
+function get_line_sector(ln,naxis,nxsector)
+    s=typemax(0)
+    for (idx,p) in enumerate(ln)
+        new_s=get_point_sector(p,naxis,nxsector)
+        if new_s==s #sector has not changed do nothing
+        elseif s==typemax(0) #some sector is identified that is not axis
+            s=new_s
+        elseif abs(new_s-s)==1 #standard sector boundary
+            s=min(s,new_s)
+        elseif abs(new_s-s)>1# #periodic sector boundary #TODO: Does not work if DOS==2
+            if new_s!=typemax(0)
+                s=max(s,new_s)
+            end
+        else
+            println("Error: Could not identify sector for line.")
+            return nothing
+        end
+    end
+    return s
+end
+
+"""
+    ln_idx = get_line_idx(ln,naxis_ln,nxsector_ln)
+
+Get index `ln_idx` of line `ln`  in a mesh that features `naxis` grid points and
+`naxis_ln' lines on the center line, `nxsector` grid points and `nxsector_ln'
+lines in a unit cell excluding the center axis.
+"""
+function get_line_idx(lines,ln,naxis,nxsector, naxis_ln,nxsector_ln,DOS)
+    s=get_line_sector(ln,naxis, nxsector)
+    if s==typemax(0)
+        return find_smplx(lines[1:naxis_ln],ln)
+    else
+        return find_smplx(lines[naxis_ln+1:naxis_ln+nxsector_ln],get_rotated_index.(ln,-s,naxis,nxsector, DOS))+s*nxsector_ln+naxis_ln
+    end
+end
+
+##
+"""
+    full_mesh=extend_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloch", unit=false)
+
+Create full mesh or unit cell from half cell represented in `mesh`.
 
 # Arguments
 - `mesh::Mesh`: mesh representing the half cell. The mesh must span a sector of `2π/2N`, where `N` is the (integer) degree of symmetry of the full mesh.
@@ -153,20 +260,14 @@ The routine copies only domains that are specified  in `doms`. These domains are
 The following are available:
 
 - `:full`: extent the domain and save it under the same name in `full_mesh`.
-- `:unit`: extent the domain and save the individual unit cells labeled from `0` to `N-1` in `full_mesh`.#
-- `:half`: extent the domain and save the individual unit cells as half cells labeled from `0` to `N-1` in full_mesh where one half-cell  contains `_img` in its name.
+- `:unit`: extent the domain and save the individual unit cells labeled from `0` to `N-1` in `full_mesh`.
+- `:half`: extent the domain and save the individual unit cells as half cells labeled from `0` to `N-1` in `full_mesh` where one half-cell  contains `_img` in its name.
 
 Multiple styles can be mixed in one domain specification. An example for `doms` would be
     doms=[("Interior", :full), ("Outlet", :unit), ("Flame", :half)]
 """
-function create_full_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloch", unit=false)
+function extend_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloch", unit=false)
     npoints=size(mesh.points,2)
-    # axis=[]
-    # for smplx_idx in mesh.domains["Centeraxis"]["simplices"]
-    #     for pnt in mesh.lines[smplx_idx]
-    #         insert_smplx!(axis,pnt)
-    #     end
-    # end
 
     bloch=[]
     for smplx_idx in mesh.domains[blch_name]["simplices"]
@@ -217,23 +318,6 @@ function create_full_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloc
     end
     #next mirror at symmetry
 
-    ##
-    # function link_triangles_to_tetrahedra(mesh::Mesh)
-    #     tetmap=Array{UInt32,1}(undef,length(mesh.triangles))
-    #     for (idx,tri) in enumerate(mesh.triangles)
-    #         for (idt::UInt32,tet) in enumerate(mesh.tetrahedra)
-    #             if all([i in tet for i=tri])
-    #                 tetmap[idx]=idt
-    #                 break
-    #             end
-    #         end
-    #     end
-    #     return tetmap
-    # end
-
-
-
-
     # compute symmetry plane
     link_triangles_to_tetrahedra!(mesh)
     tetmap=mesh.tri2tet
@@ -267,7 +351,8 @@ function create_full_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloc
     nxbloch=nbloch-naxis
     nbody=npoints-nbloch-nxsymmetry
     shiftbody=npoints-nbloch
-    shiftbloch=nxbloch+nbody+nxsymmetry+nbody
+    nxsector=nxbloch+nbody+nxsymmetry+nbody
+    nsector=nxsector+naxis
     #initialize point array
     points=zeros(3,2*npoints-nsymmetry)
     points[:,1:npoints]=mesh.points[:,new_order]
@@ -279,7 +364,7 @@ function create_full_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloc
     #reflect exclusive bloch points
     for idx=naxis+1:nbloch
         pnt=points[:,idx]
-        points[:,idx+shiftbloch]=reflect_point_at_plane(pnt,pln)
+        points[:,idx+nxsector]=reflect_point_at_plane(pnt,pln)
     end
 
     #get degree of symmetry
@@ -304,77 +389,112 @@ function create_full_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloc
         DOS_lim=DOS
         fpoints=zeros(3,nfpoints)
 
-        fpoints[:,1:naxis+nxbloch+nbody+nxsymmetry+nbody]=points[:,1:naxis+nxbloch+nbody+nxsymmetry+nbody]
+        fpoints[:,1:nsector]=points[:,1:nsector]
         for idx in 1:DOS-1
             R=create_rotation_matrix_around_axis(n,idx*phi)
-            fpoints[:,naxis+(nxbloch+nbody+nxsymmetry+nbody)*idx+1:naxis+(nxbloch+nbody+nxsymmetry+nbody)*(idx+1)]=R*(points[:,naxis+1:naxis+(nxbloch+nbody+nxsymmetry+nbody)].-p).+p
+            fpoints[:,naxis+nxsector*idx+1:naxis+nxsector*(idx+1)]=R*(points[:,naxis+1:naxis+nxsector].-p).+p
         end
         file_txt="extended from $(mesh.file)"
     end
-    domains=Dict()
-    lines=Array{UInt32,1}[]
-    triangles=Array{UInt32,1}[]
+    #domains=Dict()
+    #triangles=Array{UInt32,1}[]
 
+    reflected_index(idx) = get_reflected_index(idx,naxis,nxbloch,nbody,shiftbody,nxsymmetry,nxsector)
+    # function get_reflected_index(idx)
+    #     if idx <= naxis
+    #         idx=idx
+    #     elseif idx <= nbloch
+    #         idx=idx+nxsector
+    #     elseif idx <= nbloch+nbody
+    #             idx=idx+shiftbody
+    #     elseif idx <=  nsector-nbody #naxis+nxbloch+nbody+nxsymmetry
+    #         idx=idx
+    #     else
+    #         idx=0 #error flag
+    #     end
+    #     return idx
+    # end
 
-    function get_reflected_index(idx)
-        if idx <= naxis
-            idx=idx
-        elseif idx <= naxis+nxbloch
-            idx=idx+shiftbloch
-        elseif idx <= naxis+nxbloch+nbody
-                idx=idx+shiftbody
-        elseif idx <=  naxis+nxbloch+nbody+nxsymmetry
-            idx=idx
-        else
-            idx=0 #error flag
-        end
-        return idx
-    end
+    rotated_index(idx,sector)=get_rotated_index(idx,sector, naxis, nxsector, DOS)
+    # nasector=nxsector*DOS
+    # function get_rotated_index(idx,sector)
+    #     if idx <= naxis
+    #         idx=idx
+    #     else
+    #         idx=idx+nxsector*sector
+    #     end
+    #     #modulo for periodicity
+    #     idx=((idx-naxis-1)%nasector)+1+naxis
+    #     if idx<0
+    #         idx+=nasector
+    #     end
+    #     return idx
+    # end
 
-
-    shiftrot=nxbloch+nbody+nxsymmetry+nbody
-    function get_rotated_index(idx,sector)
-        if idx <= naxis
-            idx=idx
-        else
-            idx=idx+shiftrot*sector #sector counting starts from zero
-        end
-
-        #modulo
-        if idx>naxis+shiftrot*DOS
-            idx=idx-shiftrot*DOS
-        end
-        return idx
-    end
-
-    tetrahedra=Array{UInt32,1}[]
-
-
+    tetrahedra=Array{UInt32,1}[] #TODO: sectorwise arrangement of tetrahedra
     for (smplx_idx,tet) in enumerate(mesh.tetrahedra)
         #println(idx," ", length(tetrahedra))
         tet=trace_order[tet]
-        rtet=get_reflected_index.(tet)
+        rtet=reflected_index.(tet)
 
         for sector=0:DOS_lim-1
-            insert_smplx!(tetrahedra,get_rotated_index.(tet, sector))
-            insert_smplx!(tetrahedra,get_rotated_index.(rtet, sector))
+            insert_smplx!(tetrahedra,rotated_index.(tet, sector))
+            insert_smplx!(tetrahedra,rotated_index.(rtet, sector))
         end
     end
 
 
-    triangles=Array{UInt32,1}[]
+    triangles=Array{UInt32,1}[] #TODO: sectorwise arrangement of triangles
     for (smplx_idx,smplx) in enumerate(mesh.triangles)
         if !(smplx_idx in mesh.domains[sym_name]["simplices"]) && (!(smplx_idx in mesh.domains[blch_name]["simplices"]) || unit)
             smplx=trace_order[smplx]
-            rsmplx=get_reflected_index.(smplx)
+            rsmplx=reflected_index.(smplx)
             for sector=0:DOS_lim-1
-                insert_smplx!(triangles,get_rotated_index.(smplx, sector))
-                insert_smplx!(triangles,get_rotated_index.(rsmplx, sector))
+                insert_smplx!(triangles,rotated_index.(smplx, sector))
+                insert_smplx!(triangles,rotated_index.(rsmplx, sector))
             end
         end
     end
 
-    #build domains
+    ## sectorwise line handling
+    lines=Array{UInt32,1}[]
+    for (smplx_idx, smplx) in enumerate(mesh.lines)
+        smplx=trace_order[smplx]
+        insert_smplx!(lines,smplx)
+        if !all(smplx.<=nbloch)
+            rsmplx=reflected_index.(smplx)
+            insert_smplx!(lines,rsmplx)
+        end
+    end
+
+    #count second order dof on axis and bloch boundary
+    naxis_ln=0
+    nbloch_ln=0
+    for (idx,ln) in enumerate(lines)
+            if naxis_ln==0 &&  !all(ln.<=naxis)
+                naxis_ln=idx-1
+            end
+            if nbloch_ln==0 &&  !all(ln.<=naxis+nxbloch)
+                nbloch_ln=idx-1
+            end
+    end
+    nxbloch_ln=nbloch_ln-naxis_ln
+    nsector_ln=length(lines)#-naxis_ln
+    nxsector_ln=nsector_ln-naxis_ln
+
+    # extend to full mesh
+    if unit #just create bloch image boundary
+        for ln in lines[naxis_ln+1:nbloch_ln]
+            append!(lines,[rotated_index.(ln,1)])
+        end
+    else #create full domain
+        for sector=1:DOS-1
+            for lns in lines[naxis_ln+1:nsector_ln]
+                append!(lines,[rotated_index.(lns,sector)])
+            end
+        end
+    end
+    ##build domains
     domains=Dict()
     #build unit cell
 
@@ -387,6 +507,11 @@ function create_full_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloc
         elseif dim == 2
             list_of_simplices=mesh.triangles
             full_list_of_simplices=triangles
+        elseif dim == 1
+            list_of_simplices=mesh.lines
+            full_list_of_simplices=nothing#lines
+            println("Error: Dimension 1 not implemented for extensible domain")
+            #TODO: Implement
         end
 
         if copy_degree==:full
@@ -416,10 +541,10 @@ function create_full_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloc
         for smplx_idx in mesh.domains[dom]["simplices"]
             smplx=list_of_simplices[smplx_idx]
             smplx=trace_order[smplx]
-            rsmplx=get_reflected_index.(smplx)
+            rsmplx=reflected_index.(smplx)
             for sector=0:DOS_lim-1
-                idx=find_smplx(full_list_of_simplices,get_rotated_index.(smplx, sector))
-                ridx=find_smplx(full_list_of_simplices,get_rotated_index.(rsmplx, sector))
+                idx=find_smplx(full_list_of_simplices,rotated_index.(smplx, sector))
+                ridx=find_smplx(full_list_of_simplices,rotated_index.(rsmplx, sector))
                 if copy_degree==:full
                     append!(domains[dom]["simplices"],idx)
                     append!(domains[dom]["simplices"],ridx)
@@ -433,8 +558,53 @@ function create_full_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloc
             end
         end
     end
+
+
     #create new mesh object
-    symmetry_info=(DOS,naxis,nxbloch,nbody,nxsymmetry,n)
-    full_mesh=Mesh(mesh.file,fpoints,UInt16[],triangles, tetrahedra, domains, file_txt, zeros(UInt32,length(triangles)), symmetry_info)
+    #symmetry_info=(DOS,naxis,nxbloch,nbody,nxsymmetry,n,naxis_ln,nxbloch_ln,nxsector_ln)
+    symmetry_info=SymInfo(DOS,naxis,nxbloch,nbody,shiftbody,nxsymmetry,nxsector,naxis_ln,nxbloch_ln,nxsector_ln,0,0,n,p,unit)
+    tri2tet=zeros(UInt32,length(triangles))
+    tri2tet[1]=0xffffffff #magic sentinel value to check whether list is linked
+    full_mesh=Mesh(mesh.file,fpoints,lines,triangles, tetrahedra, domains, file_txt, tri2tet, symmetry_info)
     return full_mesh
+end
+## wrapper fpr finder routines  to Mesh type
+"""
+    sidx=get_point_sector(mesh::Mesh,pnt_idx)
+
+Get sector idx `sidx`of point with index `pnt_idx`in mesh `mesh`.
+"""
+function get_point_sector(mesh::Mesh,pnt_idx)
+    if mesh.dos==1
+        return 0
+    else
+        return get_point_sector(pnt_idx, mesh.dos.naxis, mesh.dos.nxsector)
+    end
+end
+
+"""
+    sidx = get_line_sector(mesh::Mesh, ln)
+
+Get sector idx `sidx`of line `ln` in mesh `mesh`.
+"""
+function get_line_sector(mesh::Mesh, ln)
+    if mesh.dos==1
+        return 0
+    else
+        return get_line_sector(ln,mesh.dos.naxis,mesh.dos.nxsector)
+    end
+end
+# line finder for mesh TODO: smplx_finder for mesh
+"""
+    ln_idx = get_line_idx(mesh::Mesh, ln)
+
+Get index `ln_idx` of line `ln` in mesh `mesh`.
+"""
+function get_line_idx(mesh::Mesh, ln)
+    if mesh.dos==1
+        ln_idx=find_smplx(mesh.lines,ln)
+    else
+        ln_idx=get_line_idx(mesh.lines,ln,mesh.dos.naxis,mesh.dos.nxsector,mesh.dos.naxis_ln,mesh.dos.nxsector_ln,mesh.dos.DOS)
+    end
+    return ln_idx
 end

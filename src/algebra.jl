@@ -1,4 +1,6 @@
 ## algebra
+#include("fit_ss.jl")
+
 function pow0(z::ComplexF64,k::Int=0)::ComplexF64
   if k==0
     return 1
@@ -66,6 +68,29 @@ function exp_delay(ω,τ,m,n)
   end
   f*=a^m*exp(a*ω*τ)
   return f
+end
+
+function generate_stsp_z(A,B,C,D)
+  function stsp_z(z,n)
+    f = (-im)^n*factorial(n)*C*(im*z*LinearAlgebra.I-A)^(-n-1)*B
+    if n==0
+      f = f+D
+    end
+    return f[1]
+  end
+  return stsp_z
+end
+
+function generate_z_g_z(g)
+  function z_g_z(z,n)
+    if n == 0
+      f = z*g(z,0)
+    else
+      f = z*g(z,n)+n*g(z,n-1)
+    end
+    return f
+  end
+  return z_g_z
 end
 
 tau_delay=exp_delay
@@ -167,4 +192,40 @@ function exp_ax2mxit(z,τ,a,m,n,k)
   end
     coeff*=(-1.0im)^n
     return coeff
+end
+
+function generate_Σy_exp_ikx(y)
+  N=length(y)
+  function Σy_exp_ikx(z::ComplexF64,n::Int)
+    f=0.0+0.0im
+    for (k,y) in enumerate(y)
+      k-=1 #zero-based counting of wave-number
+      f+=k^n*y*exp(2*pi*1.0im*k/N*z)
+    end
+    f*=(2*pi*1.0im/N)^n
+    return f
+  end
+  return Σy_exp_ikx
+end
+
+function generate_gz_hz(g,h)
+  function func(z::ComplexF64,k::Int)
+    f=0.0+0.0im
+    for i = 0:k
+      f+=binomial(k,i)*h(z,k-i)*g(z,i)
+    end
+    return f
+  end
+  return func
+end
+
+function generate_1_gz(g)
+  function func(z::ComplexF64,k::Int)
+    if k==0
+      return 1-g(z,k)
+    else
+      return -g(z,k)
+    end
+  end
+  return func
 end

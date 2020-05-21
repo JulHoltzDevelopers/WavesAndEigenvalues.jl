@@ -24,7 +24,7 @@ The original algorithm was first presented by Beyn in [1]. The implementation cl
 # References
 [1] W.-J. Beyn, An integral method for solving nonlinear eigenvalue problems, Linear Algebra and its Applications, 2012, 436(10), p.3839-3863, https://doi.org/10.1016/j.laa.2011.03.030
 
-[2] P.E. Buschmann, G.A. Mensah, J.P. Moeck, Solution of Thermoacoustic Eigenvalue Problems with a Non-Iterative Method, 2019, J. Eng. Gas Turbines Power, (accepted manuscript) https://doi.org/10.1115/1.4045076
+[2] P.E. Buschmann, G.A. Mensah, J.P. Moeck, Solution of Thermoacoustic Eigenvalue Problems with a Non-Iterative Method, J. Eng. Gas Turbines Power, Mar 2020, 142(3): 031022 (11 pages) https://doi.org/10.1115/1.4045076
 
 See also: [`householder`](@ref), [`juniper`](@ref), [`nicoud`](@ref), [`picard`](@ref)
 """
