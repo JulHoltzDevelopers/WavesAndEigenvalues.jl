@@ -116,13 +116,13 @@ function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,na
                 end
                 println("$i $j"); flush(stdout)
                 if     crdnt==0 && crdnt_adj==0
-                    M[i,j]=tet_integrate(coeff*fi*fj)
+                    M[i,j]=tet_integrate(coeff*fi*fj).simplify()
                 elseif crdnt!=0 && crdnt_adj==0
-                    M[i,j]=tet_integrate(coeff*fi*SymPy.diff(fj,X[crdnt]))
+                    M[i,j]=tet_integrate(coeff*fi*SymPy.diff(fj,X[crdnt])).simplify()
                 elseif crdnt==0 && crdnt_adj!=0
-                    M[i,j]=tet_integrate(coeff*SymPy.diff(fi,X[crdnt_adj])*fj)
+                    M[i,j]=tet_integrate(coeff*SymPy.diff(fi,X[crdnt_adj])*fj).simplify()
                 elseif crdnt!=0 && crdnt_adj!=0
-                    M[i,j]=tet_integrate(coeff*SymPy.diff(fi,X[crdnt_adj])*SymPy.diff(fj,X[crdnt]))
+                    M[i,j]=tet_integrate(coeff*SymPy.diff(fi,X[crdnt_adj])*SymPy.diff(fj,X[crdnt])).simplify()
                 end
                 if symmetric
                     M[j,i]=M[i,j]
@@ -145,7 +145,7 @@ function local_vector(order=1,corder=2, crdnt=0, crdnt_adj=0 )
 
     M=Array{Any}(undef,length(f))
     for (i,fi) in enumerate(f)
-        M[i]=tri_integrate(fi*coeff).subs(z, 0)
+        M[i]=tri_integrate(fi*coeff).subs(z, 0).simplify()
     end
 
     return M
@@ -153,7 +153,7 @@ end
 
 ##
 
-Dx=local_matrix(1,diff(sum(C[1])),1)
+#Dx=local_matrix(1,diff(sum(C[1])),1)
 #Dy=local_matrix(1,0,2)
 #Dz=local_matrix(1,0,3)
 
@@ -192,23 +192,52 @@ function print_matrix(M,coeff=false,symmetric=false)
             end
         end
     end
+
+    txt=replace(txt,"A11"=>"A[1,1]")
+    txt=replace(txt,"A12"=>"A[1,2]")
+    txt=replace(txt,"A13"=>"A[1,3]")
+    txt=replace(txt,"A21"=>"A[2,1]")
+    txt=replace(txt,"A22"=>"A[2,2]")
+    txt=replace(txt,"A23"=>"A[2,3]")
+    txt=replace(txt,"A31"=>"A[3,1]")
+    txt=replace(txt,"A32"=>"A[3,2]")
+    txt=replace(txt,"A33"=>"A[3,3]")
+
     println(txt)
+    return txt
 end
 ##
 #M =local_matrix(1,0) mass matrix
 #M=local_matrix(1,0,0,3)
 #M=local_matrix(1,diff(sum(C[1]),z),0)
-M=local_matrix(1,0,nabla=true)
+M=local_matrix(2,0,nabla=true,symmetric=true)
 
 
-print_matrix(M,true,true)
+txt=print_matrix(M,true,true)
 ## vectors
 
-M=local_vector(1,0)
+M=local_vector(2,0)
 
+### derivatives
+function deriv()
+    DD=Array{Any}(undef,4,3)
+    df=0
+    for j=1:3
+        for fi in C[2]
+            for (i,xx) in enumerate([x,y,z])
+                df+=SymPy.diff(fi,x)*A[i,j]
+            end
+        end
+        DD[1,j]=dfi.subs(x,1).subs(y,0).subs(z,0)
+        DD[2,j]=dfi.subs(x,0).subs(y,1).subs(z,0)
+        DD[3,j]=dfi.subs(x,0).subs(y,0).subs(z,1)
+        DD[4,j]=dfi.subs(x,0).subs(y,0).subs(z,0)
+    end
+    return DD
+end
 
-
-
+##
+DD=deriv()
 ###############################################################
 ## legacy code
 ###############################################################

@@ -4,17 +4,55 @@ import SparseArrays, LinearAlgebra, ProgressMeter
 include("./src/FEM.jl")
 
 #
-function potflow(mesh::Mesh,dscrp)
+import ..Meshutils: get_line_idx
+function aggregate_elements(mesh::Mesh, el_type=1)
+    if length(mesh.lines)==0
+        collect_lines!(mesh)
+    end
     N_points=size(mesh.points)[2]
-    dim=deepcopy(N_points)
+    if el_type==2
+        triangles=Array{UInt32,1}[] #TODO: preallocation?
+        tetrahedra=Array{UInt32,1}[]
+        tet=Array{UInt32}(undef,10)
+        tri=Array{UInt32}(undef,6)
+        for (idx,smplx) in enumerate(mesh.tetrahedra) #TODO: no enumeration
+            tet[1:4]=smplx[:]
+            tet[5]=get_line_idx(mesh,smplx[[1,2]])+N_points#find_smplx(mesh.lines,smplx[[1,2]])+N_points #TODO: type stability
+            tet[6]=get_line_idx(mesh,smplx[[1,3]])+N_points
+            tet[7]=get_line_idx(mesh,smplx[[1,4]])+N_points
+            tet[8]=get_line_idx(mesh,smplx[[2,3]])+N_points
+            tet[9]=get_line_idx(mesh,smplx[[2,4]])+N_points
+            tet[10]=get_line_idx(mesh,smplx[[3,4]])+N_points
+            push!(tetrahedra,copy(tet))
+        end
+        for (idx,smplx) in enumerate(mesh.triangles)
+            tri[1:3]=smplx[:]
+            tri[4]=get_line_idx(mesh,smplx[[1,2]])+N_points
+            tri[5]=get_line_idx(mesh,smplx[[1,3]])+N_points
+            tri[6]=get_line_idx(mesh,smplx[[2,3]])+N_points
+            push!(triangles,copy(tri))
+        end
+    elseif el_type==1
+            tetrahedra=mesh.tetrahedra
+            triangles=mesh.triangles
+    end
+
+    return triangles, tetrahedra
+end
+
+
+function potflow(mesh::Mesh,dscrp)
+    triangles, tetrahedra = aggregate_elements(mesh,2)
+    N_points=size(mesh.points)[2]
+    dim=deepcopy(N_points)+length(mesh.lines)
     MM=Float64[]
     II=Int64[]
     JJ=Int64[]
 
-    for smplx in mesh.tetrahedra
-        J=CooTrafo(mesh.points[:,smplx])
+    for smplx in tetrahedra
+        J=CooTrafo(mesh.points[:,smplx[1:4]])
         ii, jj =create_indices(smplx)
-        mm=s43nv1nu1(J)
+        mm=s43nv2nu2(J)
         append!(MM,mm[:])
         append!(II,ii[:])
         append!(JJ,jj[:])
@@ -28,9 +66,9 @@ function potflow(mesh::Mesh,dscrp)
         simplices=mesh.domains[dom]["simplices"]
         MM=Float64[]
         II=Int64[]
-        for smplx in mesh.triangles[simplices]
-            J=CooTrafo(mesh.points[:,smplx])
-            mm=-s33v1(J)*a
+        for smplx in triangles[simplices]
+            J=CooTrafo(mesh.points[:,smplx[1:3]])
+            mm=-s33v2(J)*a
             v[smplx[:]]+=mm[:]
         end
     end
@@ -192,6 +230,7 @@ dscrp["Outlet"]=1.0
 dscrp["Inlet"]=-1.0
 L,v=potflow(mesh,dscrp)
 phi=L\v
+##
 for smplx in mesh.tetrahedra
     J=CooTrafo(mesh.points[:,smplx])
     sum(J.inv\phi[smplx] #ZODO: Hier weitermachen
