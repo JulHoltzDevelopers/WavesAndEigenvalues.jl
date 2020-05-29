@@ -1,0 +1,8 @@
+## test find_line_idx
+# for (idx,ln) in enumerate(full_mesh.lines)
+#     println(idx)
+#     if idx!=get_line_idx(full_mesh,ln)
+#         println("here $idx")
+#         break
+#     end
+# end

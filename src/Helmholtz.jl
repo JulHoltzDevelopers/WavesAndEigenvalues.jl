@@ -9,7 +9,7 @@ import ..Meshutils: get_line_idx
 import ..NLEVP: generate_1_gz
 include("Meshutils_exports.jl")
 include("NLEVP_exports.jl")
-#include("shape_sensitivity.jl")
+include("shape_sensitivity.jl")
 include("Bloch.jl")
 export discretize
 ##
@@ -201,10 +201,10 @@ function discretize(mesh::Mesh, dscrp, C; el_type=1, c_type=0, b=:__none__, mass
                 boundary_txt=adm_txt
             end
 
-        elseif type==:flame
+        elseif type==:flame #TODO: unified interface with flameresponse and normalize n_ref
             make=[:Q]
             gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val=data
-            nlocal=(gamma-1)/rho*nglobal/compute_volume!(mesh,domain)
+            nlocal=(gamma-1)/rho*nglobal/compute_size!(mesh,domain)
             if n_sym ∉ keys(L.params)
                 L.params[n_sym]=n_val
             end
@@ -218,7 +218,7 @@ function discretize(mesh::Mesh, dscrp, C; el_type=1, c_type=0, b=:__none__, mass
         elseif type==:flameresponse
             make=[:Q]
             gamma,rho,nglobal,x_ref,n_ref,eps_sym,eps_val=data
-            nlocal=(gamma-1)/rho*nglobal/compute_volume!(mesh,domain)
+            nlocal=(gamma-1)/rho*nglobal/compute_size!(mesh,domain)
             if eps_sym ∉ keys(L.params)
                 L.params[eps_sym]=eps_val
             end
@@ -228,7 +228,7 @@ function discretize(mesh::Mesh, dscrp, C; el_type=1, c_type=0, b=:__none__, mass
         elseif type==:fancyflame
             make=[:Q]
             gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym, a_sym, n_val, tau_val, a_val=data
-            nlocal=(gamma-1)/rho*nglobal/compute_volume!(mesh,domain)
+            nlocal=(gamma-1)/rho*nglobal/compute_size!(mesh,domain)
             if n_sym ∉ keys(L.params)
                 L.params[n_sym]=n_val
             end

@@ -19,7 +19,7 @@ function pow1(z::ComplexF64,k::Int=0)::ComplexF64
   elseif k>1
     return 0
   else
-    return complex(NaN)
+    return complex(NaN)#force NaN if a negative derivative is requested
   end
 end
 
@@ -33,7 +33,7 @@ function pow2(z::ComplexF64,k::Int=0)::ComplexF64
   elseif k>2
     return 0
   else
-    return complex(NaN)
+    return complex(NaN) #force NaN if a negative derivative is requested
   end
 end
 

@@ -1,7 +1,7 @@
 #types
 export Term,LinearOperatorFamily, Solution, save
 #solvers
-export householder, juniper, nicoud, picard, beyn
+export householder, beyn
 #perturbation stuff
 export pade!, perturb!, perturb_fast!, perturb_norm!, estimate_pol, conv_radius
 #export algebra

@@ -26,7 +26,7 @@ The original algorithm was first presented by Beyn in [1]. The implementation cl
 
 [2] P.E. Buschmann, G.A. Mensah, J.P. Moeck, Solution of Thermoacoustic Eigenvalue Problems with a Non-Iterative Method, J. Eng. Gas Turbines Power, Mar 2020, 142(3): 031022 (11 pages) https://doi.org/10.1115/1.4045076
 
-See also: [`householder`](@ref), [`juniper`](@ref), [`nicoud`](@ref), [`picard`](@ref)
+See also: [`householder`](@ref)
 """
 function beyn(L::LinearOperatorFamily,Γ;l=5,K=1,N=16,tol=0.0,pos_test=true,output=false)
     #This is Beyn's algorithm as implemented in Buschmann et al. 2019

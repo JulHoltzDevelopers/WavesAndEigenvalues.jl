@@ -65,7 +65,7 @@ This means a line is a two-entry list, a triangle a three-entry list, and a tetr
 For convenience certain entities of the mesh can be further defined in the `domains` dictionary. Each key defines a domain and maps to another dictionary.
 This second-level dictionary contains at least two keys: `"dimension"` mapping to the dimension of the specified domain (1,2, or 3) and
 `"simplices"` containing a list of integers mapping into the respective simplex lists. More keys may be added to the dictionary to
-define additional and/or custom information on the domain. For instance the `compute_volume!` function adds an entry with the domain size.
+define additional and/or custom information on the domain. For instance the `compute_size!` function adds an entry with the domain size.
 """
 struct Mesh
     name
@@ -494,12 +494,12 @@ end
 
 ##
 """
-    compute_volume!(mesh::Mesh,dom::String)
+    compute_size!(mesh::Mesh,dom::String)
 
 Compute the size of the domain `dom` and store it in the field `"size"` of the domain definition.
 The size will be a length, area, or volume depending on the dimension of the domain.
 """
-function compute_volume!(mesh::Mesh,dom::String)
+function compute_size!(mesh::Mesh,dom::String)
     dim=mesh.domains[dom]["dimension"]
     V=0 #TODO: check whether domains are properly defined
     if dim ==3
