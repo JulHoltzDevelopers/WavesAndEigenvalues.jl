@@ -5,12 +5,12 @@ include("./src/FEM.jl")
 
 #
 import ..Meshutils: get_line_idx
-function aggregate_elements(mesh::Mesh, el_type=1)
+function aggregate_elements(mesh::Mesh, el_type=:1)
     if length(mesh.lines)==0
         collect_lines!(mesh)
     end
     N_points=size(mesh.points)[2]
-    if el_type==2
+    if el_type==:2
         triangles=Array{UInt32,1}[] #TODO: preallocation?
         tetrahedra=Array{UInt32,1}[]
         tet=Array{UInt32}(undef,10)
@@ -32,9 +32,18 @@ function aggregate_elements(mesh::Mesh, el_type=1)
             tri[6]=get_line_idx(mesh,smplx[[2,3]])+N_points
             push!(triangles,copy(tri))
         end
-    elseif el_type==1
+    elseif el_type==:1
             tetrahedra=mesh.tetrahedra
             triangles=mesh.triangles
+    elseif el_type=:h
+        triangles=Array{Any}(undef,length(mesh.triangles))
+        tetrahedra=Array{Any}(undef,length(mesh.tetrahedra))
+        tet=Array{UInt32}(undef,20)
+        tri=Array{UInt32}(undef,10)
+        for (idx,smplx) in enumerate(mesh.triangles)
+        end
+        for (idx, smplx) in enumerate(mesh.tetrahedra)
+        end        
     end
 
     return triangles, tetrahedra

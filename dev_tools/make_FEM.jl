@@ -22,20 +22,123 @@ f7 = 4*x*a
 f8 = 4*y*z
 f9 = 4*y*a
 f10 = 4*z*a
+##
+#hermite shape functions (third order polynomial)
+fh_vtx(x,y,z)=1-3*x^2-13*x*y-13*x*z-3*y^2-13*y*z-3*z^2+2*x^3+13*x^2*y+13*x^2*z+13*x*y^2+33*x*y*z+13*x*z^2+2*y^3+13*y^2*z+13*y*z^2+2*z^3
+fh_dvtx(x,y,z)=x-2*x^2-3*x*y-3*x*z+x^3+3*x^2*y+3*x^2*z+2*x*y^2+4*x*y*z+2*x*z^2
+fh_dvtxx(x,y,z)=-x^2+2*x*y+2x*z+x^3-2*x^2*y-2*x^2*z-2*x*y^2-2x*y*z-2*x*z^2
+fh_fc(x,y,z)=27*x*y*z
+##
+fh01=fh_vtx(y,z,a)
+fh02=fh_vtx(x,z,a)
+fh03=fh_vtx(x,y,a)
+fh04=fh_vtx(x,y,z)
+#partial derivatives (arguement order matters)
+# wrt x
+fh05=fh_dvtxx(x,y,z)
+fh06=fh_dvtx(x,a,z).expand()
+fh07=fh_dvtx(x,y,a).expand()
+fh08=fh_dvtx(x,y,z).expand()
+# wrt y
+fh09=fh_dvtx(y,z,a).expand()
+fh10=fh_dvtxx(y,x,z)
+fh11=fh_dvtx(y,x,a).expand()
+fh12=fh_dvtx(y,x,z).expand()
 
+#wrt z
+fh13=fh_dvtx(z,y,a).expand()
+fh14=fh_dvtx(z,x,a).expand()
+fh15=fh_dvtxx(z,x,y)
+fh16=fh_dvtx(z,x,y).expand()
+#
+fh17=fh_fc(y,z,a)
+fh18=fh_fc(x,z,a)
+fh19=fh_fc(x,y,a)
+fh20=fh_fc(x,y,z)
+
+herm_surf=[1 2 4 5 6 8 9 10 12 19]
+
+##
+function check_hermitian(f)
+    for (j,pnt) in enumerate([(1,0,0), (0,1,0), (0,0,1), (0,0,0),(0,1/3,1/3), (1/3,0,1/3), (1/3,1/3,0), (1/3,1/3,1/3)])
+        xx,yy,zz=pnt
+        res=f.subs(x,xx).subs(y,yy).subs(z,zz).simplify()
+        println("$pnt ---> $res")
+        res=diff(f,x).subs(x,xx).subs(y,yy).subs(z,zz).simplify()
+        if j<=4
+            println("dx $pnt ---> $res")
+            res=diff(f,y).subs(x,xx).subs(y,yy).subs(z,zz).simplify()
+            println("dy $pnt ---> $res")
+            res=diff(f,z).subs(x,xx).subs(y,yy).subs(z,zz).simplify()
+            println("dz $pnt ---> $res")
+        end
+    end
+end
+
+
+##
 #zweiter ordnung
 X=[x,y,z,a]
-F= [[x,y,z,a], [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 ],]
+F= [[x,y,z,a], [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 ],[fh01, fh02,fh03,fh04,fh05,fh06,fh07,fh08,fh09,fh10,fh11,fh12,fh13,fh14,fh15,fh16,fh17,fh18,fh19,fh20]]
 C= [[c1*x, c2*y, c3*z, c4*a,],[c1*f1, c2*f2, c3*f3, c4*f4, c5*f5, c6*f6, c7*f7, c8*f8, c9*f9, c10*f10 ],]
 f = [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 ]
 ff=[f1,f4,f5,f7]
 
+
+##
+function check_hermitian_mat(F)
+    M=Array{Any}(undef,20,20)
+    for (i,f) in enumerate(F)
+        for (j,pnt) in enumerate([(1,0,0), (0,1,0), (0,0,1), (0,0,0), (0,1/3,1/3), (1/3,0,1/3), (1/3,1/3,0), (1/3,1/3,1/3)])
+            xx,yy,zz=pnt
+            res=f.subs(x,xx).subs(y,yy).subs(z,zz).simplify()
+            #println("$pnt ---> $res")
+
+            res=diff(f,x).subs(x,xx).subs(y,yy).subs(z,zz).simplify()
+            if j >4
+                idx=j+12
+            else
+                idx=j
+            end
+            M[idx,i]=res
+
+            if j<=4
+                res=diff(f,x).subs(x,xx).subs(y,yy).subs(z,zz).simplify()
+                #println("dx $pnt ---> $res")
+                M[j+4,i]=res
+                res=diff(f,y).subs(x,xx).subs(y,yy).subs(z,zz).simplify()
+                #println("dy $pnt ---> $res")
+                M[j+8,i]=res
+                res=diff(f,z).subs(x,xx).subs(y,yy).subs(z,zz).simplify()
+                #println("dz $pnt ---> $res")
+                M[j+12,i]=res
+            end
+        end
+    end
+    return M
+end
+TT=check_hermitian_mat(F[3])
 #erster ordnung
 #f = [x y z a]
 # cs=[c1*x, c2*y, c3*z, c4*a,]
 # c=sum(cs)
 # #0. ordnung
 # c=SymPy.symbols("c")
+##
+
+function grad(f)
+    return [SymPy.diff(f,x); SymPy.diff(f,y); SymPy.diff(f,z)]
+end
+
+function matmul(h,A,g)
+    out=0
+    for i = 1:3
+        for j=1:3
+            out+=h[i]*A[i,j]*g[j]
+        end
+    end
+    return out
+end
 ##
 function gradient(f)
     N=length(f)
@@ -92,7 +195,7 @@ function boundary_source_vector(f)
 end
 
 ## build (q,p_j)
-function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,nabla=false)
+function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,typ=:none)
     f=F[order]
     if typeof(corder)==SymPy.Sym
         coeff=corder
@@ -102,27 +205,40 @@ function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,na
         coeff=sum(C[corder])
     end
 
+    if typ==:boundary
+        f=f[herm_surf]
+    end
+
     M=Array{Any}(undef,length(f),length(f))
         for (i,fi) in enumerate(f)
             for (j,fj) in enumerate(f)
+                if typ==:nabla
+                    if j==1
+                        fi=grad(fi)
+                    end
+                end
                 if symmetric && j<i
                     continue
                 end
-                if nabla
-                    if j==1
-                        fi=transpose(gradient(fi))
-                    end
-                    fj=A*gradient(fj)
-                end
                 println("$i $j"); flush(stdout)
-                if     crdnt==0 && crdnt_adj==0
-                    M[i,j]=tet_integrate(coeff*fi*fj).simplify()
+                if typ==:nabla
+                    fj=grad(fj)
+                    intg=matmul(fj,A,fi)
+                elseif typ==:boundary
+                    intg=(fj.subs(z,0)*fi.subs(z,0)).simplify()
+                elseif  crdnt==0 && crdnt_adj==0
+                    intg=(fi*fj).simplify()
                 elseif crdnt!=0 && crdnt_adj==0
-                    M[i,j]=tet_integrate(coeff*fi*SymPy.diff(fj,X[crdnt])).simplify()
+                    intg=(fi*SymPy.diff(fj,X[crdnt])).simplify()
                 elseif crdnt==0 && crdnt_adj!=0
-                    M[i,j]=tet_integrate(coeff*SymPy.diff(fi,X[crdnt_adj])*fj).simplify()
+                    intg=(SymPy.diff(fi,X[crdnt_adj])*fj).simplify()
                 elseif crdnt!=0 && crdnt_adj!=0
-                    M[i,j]=tet_integrate(coeff*SymPy.diff(fi,X[crdnt_adj])*SymPy.diff(fj,X[crdnt])).simplify()
+                    intg=(SymPy.diff(fi,X[crdnt_adj])*SymPy.diff(fj,X[crdnt])).simplify()
+                end
+                if typ==:boundary
+                    M[i,j]=tri_integrate(coeff*intg)
+                else
+                    M[i,j]=tet_integrate(coeff*intg)
                 end
                 if symmetric
                     M[j,i]=M[i,j]
@@ -210,14 +326,14 @@ end
 #M =local_matrix(1,0) mass matrix
 #M=local_matrix(1,0,0,3)
 #M=local_matrix(1,diff(sum(C[1]),z),0)
-M=local_matrix(2,0,nabla=true,symmetric=true)
+M=local_matrix(3,0,typ=:boundary,symmetric=true)
 
 
-txt=print_matrix(M,true,true)
+txt=print_matrix(M,false,true)
 ## vectors
 
-M=local_vector(2,0)
-
+M=local_vector(3,0)
+M[herm_surf]
 ### derivatives
 function deriv()
     DD=Array{Any}(undef,4,3)
