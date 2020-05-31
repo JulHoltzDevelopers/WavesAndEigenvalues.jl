@@ -56,7 +56,7 @@ fh18=fh_fc(x,z,a)
 fh19=fh_fc(x,y,a)
 fh20=fh_fc(x,y,z)
 
-herm_surf=[1 2 4 5 6 8 9 10 12 19]
+
 
 ##
 function check_hermitian(f)
@@ -83,6 +83,7 @@ F= [[x,y,z,a], [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 ],[fh01, fh02,fh03,fh04,
 C= [[c1*x, c2*y, c3*z, c4*a,],[c1*f1, c2*f2, c3*f3, c4*f4, c5*f5, c6*f6, c7*f7, c8*f8, c9*f9, c10*f10 ],]
 f = [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 ]
 ff=[f1,f4,f5,f7]
+surf=[[1,2,4],[1,2,4,5,7,9],[1 2 4 5 6 8 9 10 12 19]]
 
 
 ##
@@ -206,7 +207,7 @@ function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,ty
     end
 
     if typ==:boundary
-        f=f[herm_surf]
+        f=f[surf[order]]
     end
 
     M=Array{Any}(undef,length(f),length(f))
@@ -236,7 +237,7 @@ function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,ty
                     intg=(SymPy.diff(fi,X[crdnt_adj])*SymPy.diff(fj,X[crdnt])).simplify()
                 end
                 if typ==:boundary
-                    M[i,j]=tri_integrate(coeff*intg)
+                    M[i,j]=tri_integrate((coeff*intg).subs(z,0))
                 else
                     M[i,j]=tet_integrate(coeff*intg)
                 end
@@ -249,7 +250,7 @@ function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,ty
     return M
 end
 
-function local_vector(order=1,corder=2, crdnt=0, crdnt_adj=0 )
+function local_vector(order=1,corder=2, crdnt=0, crdnt_adj=0, typ=:none )
     f=F[order]
     if typeof(corder)==SymPy.Sym
         coeff=corder
@@ -258,10 +259,17 @@ function local_vector(order=1,corder=2, crdnt=0, crdnt_adj=0 )
     else
         coeff=sum(C[corder])
     end
+    if typ==:boundary
+        f=surf[order]
+    end
 
     M=Array{Any}(undef,length(f))
     for (i,fi) in enumerate(f)
-        M[i]=tri_integrate(fi*coeff).subs(z, 0).simplify()
+        if typ==boundary
+            M[i]=tri_integrate((fi*coeff).subs(z, 0).simplify()).simplify()
+        else
+            M[i]=tet_integrate(fi*coeff).simplify()
+        end
     end
 
     return M
@@ -319,6 +327,17 @@ function print_matrix(M,coeff=false,symmetric=false)
     txt=replace(txt,"A32"=>"A[3,2]")
     txt=replace(txt,"A33"=>"A[3,3]")
 
+    txt=replace(txt,"c1^2"=>"cc[1,1]")
+    txt=replace(txt,"c2^2"=>"cc[2,2]")
+    txt=replace(txt,"c3^2"=>"cc[3,3]")
+    txt=replace(txt,"c4^2"=>"cc[4,4]")
+    txt=replace(txt,"c1*c2"=>"cc[1,2]")
+    txt=replace(txt,"c1*c3"=>"cc[1,3]")
+    txt=replace(txt,"c1*c4"=>"cc[1,4]")
+    txt=replace(txt,"c2*c3"=>"cc[2,3]")
+    txt=replace(txt,"c2*c4"=>"cc[2,4]")
+    txt=replace(txt,"c3*c4"=>"cc[3,4]")
+
     println(txt)
     return txt
 end
@@ -326,14 +345,15 @@ end
 #M =local_matrix(1,0) mass matrix
 #M=local_matrix(1,0,0,3)
 #M=local_matrix(1,diff(sum(C[1]),z),0)
-M=local_matrix(3,0,typ=:boundary,symmetric=true)
+M=local_matrix(1,sum(C[1])^2,typ=:nabla,symmetric=true)
 
 
-txt=print_matrix(M,false,true)
+txt=print_matrix(M,true,true)
 ## vectors
 
 M=local_vector(3,0)
 M[herm_surf]
+###
 ### derivatives
 function deriv()
     DD=Array{Any}(undef,4,3)
