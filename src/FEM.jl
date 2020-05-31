@@ -84,7 +84,7 @@ function s33vhuh(J::CooTrafo)
         return M*abs(J.det)
 end
 
-function s33v1u1c1(J::Trafo,c)
+function s33v1u1c1(J::CooTrafo,c)
         c1,c2,c4=c
         M=Array{ComplexF64}(undef,3,3)
         M[1,1]=c1/20 + c2/60 + c4/60
@@ -142,7 +142,7 @@ function s33v2u2c1(J::CooTrafo,c)
         return M*abs(J.det)
 end
 
-s33vhuhc1(J::CooTrafo,c)
+function s33vhuhc1(J::CooTrafo,c)
         c1,c2,c4=c
         M=Array{ComplexF64}(undef,10,10)
         M[1,1]=31*c1/720 + c2/105 + c4/105

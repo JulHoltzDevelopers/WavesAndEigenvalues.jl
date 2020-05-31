@@ -1,9 +1,28 @@
 #module APE
 using WavesAndEigenvalues.Meshutils, WavesAndEigenvalues.NLEVP
+import WavesAndEigenvalues.Meshutils: find_smplx, insert_smplx!
 import SparseArrays, LinearAlgebra, ProgressMeter
 include("./src/FEM.jl")
 
 #
+function collect_triangles(mesh::Mesh)
+    inner_triangles=[]
+    for tet in mesh.tetrahedra
+        for tri in [tet[[1,2,3]],tet[[1,2,4]],tet[[1,3,4]],tet[[2,3,4]] ]
+            idx=find_smplx(mesh.triangles,tri)
+            if idx==0
+                insert_smplx!(inner_triangles,tri)
+            end
+        end
+    end
+    return inner_triangles
+end
+
+##
+
+##
+
+
 import ..Meshutils: get_line_idx
 function aggregate_elements(mesh::Mesh, el_type=:1)
     if length(mesh.lines)==0
@@ -35,15 +54,24 @@ function aggregate_elements(mesh::Mesh, el_type=:1)
     elseif el_type==:1
             tetrahedra=mesh.tetrahedra
             triangles=mesh.triangles
-    elseif el_type=:h
+    elseif el_type==:h
+        if mesh.tri2tet[1]==0xffffffff
+            link_triangles_to_tetrahedra!(mesh)
+        end
+        inner_triangles=collect_triangles(mesh) #TODO integrate into mesh structure
         triangles=Array{Any}(undef,length(mesh.triangles))
         tetrahedra=Array{Any}(undef,length(mesh.tetrahedra))
         tet=Array{UInt32}(undef,20)
         tri=Array{UInt32}(undef,10)
         for (idx,smplx) in enumerate(mesh.triangles)
+            tri[1:3]  =  smplx[:]
+            tri[4:6]  =  smplx[:]+N_points
+            tri[7:9] =  smplx[:]+2*N_points
+            tri[]
+
         end
         for (idx, smplx) in enumerate(mesh.tetrahedra)
-        end        
+        end
     end
 
     return triangles, tetrahedra
