@@ -25,11 +25,15 @@ end
 
 import ..Meshutils: get_line_idx
 function aggregate_elements(mesh::Mesh, el_type=:1)
-    if length(mesh.lines)==0
+    N_points=size(mesh.points)[2]
+    if (el_type in (:2,:h) ) &&  length(mesh.lines)==0
         collect_lines!(mesh)
     end
-    N_points=size(mesh.points)[2]
-    if el_type==:2
+
+    if el_type==:1
+        tetrahedra=mesh.tetrahedra
+        triangles=mesh.triangles
+    elseif el_type==:2
         triangles=Array{UInt32,1}[] #TODO: preallocation?
         tetrahedra=Array{UInt32,1}[]
         tet=Array{UInt32}(undef,10)
@@ -51,13 +55,10 @@ function aggregate_elements(mesh::Mesh, el_type=:1)
             tri[6]=get_line_idx(mesh,smplx[[2,3]])+N_points
             push!(triangles,copy(tri))
         end
-    elseif el_type==:1
-            tetrahedra=mesh.tetrahedra
-            triangles=mesh.triangles
     elseif el_type==:h
-        if mesh.tri2tet[1]==0xffffffff
-            link_triangles_to_tetrahedra!(mesh)
-        end
+        #if mesh.tri2tet[1]==0xffffffff
+        #    link_triangles_to_tetrahedra!(mesh)
+        #end
         inner_triangles=collect_triangles(mesh) #TODO integrate into mesh structure
         triangles=Array{Any}(undef,length(mesh.triangles))
         tetrahedra=Array{Any}(undef,length(mesh.tetrahedra))
@@ -66,14 +67,32 @@ function aggregate_elements(mesh::Mesh, el_type=:1)
         for (idx,smplx) in enumerate(mesh.triangles)
             tri[1:3]  =  smplx[:]
             tri[4:6]  =  smplx[:]+N_points
-            tri[7:9] =  smplx[:]+2*N_points
-            tri[]
-
+            tri[7:9]  =  smplx[:]+2*N_points
+            fcidx     =  find_smplx(mesh.triangles,smplx)
+            if fcidx !=0
+                tri[10]   =  fcidx+3*N_points
+            elseif
+                tri[10]   =  find_smplx(inner_triangles,smplx)+3*N_points+length(mesh.triangles)
+            end
+            triangles[idx]=copy(tri)
         end
         for (idx, smplx) in enumerate(mesh.tetrahedra)
+            tet[1:4] = smplx[:]
+            tet[5:8] = smplx[:]+N_points
+            tet[9:12] = smplx[:]+2*N_points
+            tet[13:16]= smplx[:]+3*N_points
+
+            for (jdx,tria) in enumerate(smplx[[1,2,3]],smplx[[1,2,4]],smplx[[1,3,4]],smplx[[2,3,4]])
+                fcidx     =  find_smplx(mesh.triangles,tria)
+                if fcidx !=0
+                    tet[16+jdx]   =  fcidx+3*N_points
+                elseif
+                    tet[16+jdx]   =  find_smplx(inner_triangles,tria)+3*N_points+length(mesh.triangles)
+                end
+            end
+            tetrahedra[idx]=copy(tet)
         end
     end
-
     return triangles, tetrahedra
 end
 
