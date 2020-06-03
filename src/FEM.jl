@@ -13,9 +13,6 @@ function CooTrafo(X)
                 n=LinearAlgebra.cross(J[:,1],J[:,2])
                 J[:,end]=n./LinearAlgebra.norm(n)
         end
-        #println("###HERE###")
-        #println(X)
-        #println(J)
         Jinv=LinearAlgebra.inv(J)
         det=LinearAlgebra.det(J)
         CooTrafo(J,Jinv,det)
@@ -31,6 +28,160 @@ function create_indices(smplx)
     jj=ii'
     return ii, jj
 end
+function recombine_hermite(J::CooTrafo,M)
+        A=zeros(ComplexF64,size(M))
+        J=J.trafo
+        if size(M)==(20,20)
+                valpoints=[1,2,3,4, 17,18,19,20] #point indices where value is 1 NOT the derivative!
+                # entires that are based on these points only need no recombination
+                for i =valpoints
+                        for j=valpoints
+                                A[i,j]=copy(M[i,j]) #TODO: Chek whetehr copy is needed or even deepcopy
+                        end
+                end
+
+                #now recombine entries that are based on derivativ points with value points
+                for k=0:3
+                        A[5+k,valpoints]+=M[5+k,valpoints].*J[1,1]+M[9+k,valpoints].*J[1,2]+M[13+k,valpoints].*J[1,3]
+                        A[9+k,valpoints]+=M[5+k,valpoints].*J[2,1]+M[9+k,valpoints].*J[2,2]+M[13+k,valpoints].*J[2,3]
+                        A[13+k,valpoints]+=M[5+k,valpoints].*J[3,1]+M[9+k,valpoints].*J[3,2]+M[13+k,valpoints].*J[3,3]
+
+                        A[valpoints,5+k]+=M[valpoints,5+k].*J[1,1]+M[valpoints,9+k].*J[1,2]+M[valpoints,13+k].*J[1,3]
+                        A[valpoints,9+k]+=M[valpoints,5+k].*J[2,1]+M[valpoints,9+k].*J[2,2]+M[valpoints,13+k].*J[2,3]
+                        A[valpoints,13+k]+=M[valpoints,5+k].*J[3,1]+M[valpoints,9+k].*J[3,2]+M[valpoints,13+k].*J[3,3]
+                end
+
+                #finally recombine entries based on derivative points with derivative points
+                for i = 5:16
+                        if i in (5,6,7,8) #dx
+                                Ji=J[1,:]
+                        elseif i in (9,10,11,12) #dy
+                                Ji=J[2,:]
+                        elseif i in (13,14,15,16) #dz
+                                Ji=J[3,:]
+                        end
+                        if i in (5,9,13)
+                                idcs=[5,9,13]
+                        elseif i in (6,10,14)
+                                idcs=[6,10,14]
+                        elseif i in (7,11,15)
+                                idcs=[7,11,15]
+                        elseif i in (8,12,16)
+                                idcs=[8,12,16]
+                        end
+                        for j = 5:16
+                                if j in (5,6,7,8) #dx
+                                        Jj=J[1,:]
+                                elseif j in (9,10,11,12) #dy
+                                        Jj=J[2,:]
+                                elseif j in (13,14,15,16) #dz
+                                        Jj=J[3,:]
+                                end
+                                if j in (5,9,13)
+                                        jdcs=[5,9,13]
+                                elseif j in (6,10,14)
+                                        jdcs=[6,10,14]
+                                elseif j in (7,11,15)
+                                        jdcs=[7,11,15]
+                                elseif j in (8,12,16)
+                                        jdcs=[8,12,16]
+                                end
+
+                                #actual recombination
+                                for (idk,k) in enumerate(idcs)
+                                        for (idl,l) in enumerate(jdcs)
+                                                A[i,j]+=Ji[idk]*Jj[idl]*M[k,l]
+                                        end
+                                end
+                        end
+
+                end
+                return A
+        elseif size(M)==(13,13)
+                valpoints=(1,2,3,13)#point indices where value is 1 NOT the derivative!
+                # entires that are based on these points only need no recombination
+                for i =valpoints
+                        for j=valpoints
+                                A[i,j]=copy(M[i,j]) #TODO: Chek whetehr copy is needed or even deepcopy
+                        end
+                end
+                #now recombine entries that are based on derivative points with value points
+                for k=0:2
+                        A[4+k,valpoints]+=M[4+k,valpoints].*J[1,1]+M[7+k,valpoints].*J[1,2]
+                        A[7+k,valpoints]+=M[4+k,valpoints].*J[2,1]+M[7+k,valpoints].*J[2,2]
+                        A[10+k,valpoints]+=M[4+k,valpoints].*J[3,1]+M[7+k,valpoints].*J[3,2]
+
+                        A[valpoints,4+k]+=M[valpoints,4+k].*J[1,1]+M[valpoints,7+k].*J[1,2]
+                        A[valpoints,7+k]+=M[valpoints,4+k].*J[2,1]+M[valpoints,7+k].*J[2,2]
+                        A[valpoints,10+k]+=M[valpoints,4+k].*J[3,1]+M[valpoints,7+k].*J[3,2]
+                end
+                #finally recombine entries based on derivative points with derivative points
+                for i = 4:12
+                        if i in (4,5,6) #dx
+                                Ji=J[1,:]
+                        elseif i in (7,8,9) #dy
+                                Ji=J[2,:]
+                        elseif i in (10,11,12) #dz
+                                Ji=J[3,:]
+                        end
+                        if i in (4,7,10)
+                                idcs=[4,7]
+                        elseif i in (5,8,11)
+                                idcs=[5,8]
+                        elseif i in (6,9,12)
+                                idcs=[6,9]
+                        #elseif i in (8,12,16)
+                        #        idcs=[8,12,16]
+                        end
+                        for j = 4:12
+                                if j in (4,5,6) #dx
+                                        Jj=J[1,:]
+                                elseif j in (7,8,9) #dy
+                                        Jj=J[2,:]
+                                elseif j in (10,11,12) #dz
+                                       Jj=J[3,:]
+                                end
+                                if j in (4,7,10)
+                                        jdcs=[4,7]
+                                elseif j in (5,8,11)
+                                        jdcs=[5,8]
+                                elseif j in (6,9,12)
+                                        jdcs=[6,9]
+                                #elseif j in (8,12,16)
+                                #        jdcs=[8,12,16]
+                                end
+
+                                #actual recombination
+                                for (idk,k) in enumerate(idcs)
+                                        for (idl,l) in enumerate(jdcs)
+                                                A[i,j]+=Ji[idk]*Jj[idl]*M[k,l]
+                                        end
+                                end
+                        end
+
+                end
+
+                return A
+
+
+        elseif length(M)==13
+                valpoints=(1,2,3,13)
+                for i in valpoints
+                        A[i]=copy(M[i])
+                end
+
+                #diffpoints=(4,5,6,7,8,9)
+                for k in 0:2
+                        A[4+k]=J[1,1]*M[4+k]+J[1,2]*M[7+k]
+                        A[7+k]=J[2,1]*M[4+k]+J[2,2]*M[7+k]
+                        A[10+k]=J[3,1]*M[4+k]+J[3,2]*M[7+k]
+                end
+                return A
+        end
+
+        return nothing #force crash if input format is not supported
+end
+
 
 # Functions to compute local finite element matrices on simplices. The function
 # names follow the pattern `sAB[d]v[d]uC[[d]cD]`. Where
@@ -53,6 +204,7 @@ end
 #TODO: multiple dispatch instead of/additionally to function names
 
 ## mass matrices
+#triangles
 function s33v1u1(J::CooTrafo)
      M=[1/12 1/24 1/24;
         1/24 1/12 1/24;
@@ -81,7 +233,7 @@ function s33vhuh(J::CooTrafo)
         -1/2520 -53/5040 -1/2520 1/10080 -1/1008 1/3360 -1/2520 1/504 -1/2520 -3/560;
         -13/10080 17/10080 53/10080 1/3360 -1/10080 1/5040 -1/5040 -1/2520 1/1260 3/1120;
         3/112 3/112 3/112 -3/560 3/1120 3/1120 3/1120 -3/560 3/1120 81/560]
-        return M*abs(J.det)
+        return recombine_hermite(J,M)*abs(J.det)
 end
 
 function s33v1u1c1(J::CooTrafo,c)
@@ -245,10 +397,10 @@ function s33vhuhc1(J::CooTrafo,c)
         M[9,8]=M[8,9]
         M[10,8]=M[8,10]
         M[10,9]=M[9,10]
-        return M*abs(J.det)
+        return recombine_hermite(J,M)*abs(J.det)
 end
 
-
+#tetrahedra
 function s43v1u1(J::CooTrafo)
     M = [1/60 1/120 1/120 1/120;
           1/120 1/60 1/120 1/120;
@@ -292,7 +444,7 @@ function s43vhuh(J::CooTrafo)
         1/6720 -1/320 1/6720 1/6720 1/6720 -1/3360 0 0 -1/6720 1/1120 -1/6720 -1/6720 0 -1/3360 1/6720 0 9/1120 9/560 9/1120 9/1120;
         1/6720 1/6720 -1/320 1/6720 1/6720 0 -1/3360 0 0 1/6720 -1/3360 0 -1/6720 -1/6720 1/1120 -1/6720 9/1120 9/1120 9/560 9/1120;
         1/6720 1/6720 1/6720 -1/320 1/6720 0 0 -1/3360 0 1/6720 0 -1/3360 0 0 1/6720 -1/3360 9/1120 9/1120 9/1120 9/560]
-        return M*abs(J.det)
+        return recombine_hermite(J,M)*abs(J.det)
 end
 
 function s43v1u1c1(J::CooTrafo,c)
@@ -826,7 +978,7 @@ function s43vhuhc1(J::CooTrafo,c)
         M[19,18]=M[18,19]
         M[20,18]=M[18,20]
         M[20,19]=M[19,20]
-        return M*abs(J.det)
+        return recombine_hermite(J,M)*abs(J.det)
 end
 
 ## partial derivatives
@@ -961,52 +1113,51 @@ function s43nv2nu2(J::CooTrafo)
         M[1,8]=-A[1,2]/30 - A[1,3]/30
         M[1,9]=A[1,1]/30 + A[1,3]/30
         M[1,10]=A[1,1]/30 + A[1,2]/30
-        M[2,2]=A[1,2]/120
-        M[2,3]=-A[1,3]/360
-        M[2,4]=A[1,1]/360 + A[1,2]/360 + A[1,3]/360
-        M[2,5]=-A[1,2]/90
-        M[2,6]=-A[1,1]/90 - A[1,3]/90
-        M[2,7]=A[1,2]/90 + A[1,3]/90
-        M[2,8]=-A[1,2]/90
-        M[2,9]=-A[1,2]/90
-        M[2,10]=A[1,1]/90 + A[1,2]/90
-        M[3,3]=A[1,3]/120
-        M[3,4]=A[1,1]/360 + A[1,2]/360 + A[1,3]/360
-        M[3,5]=-A[1,1]/90 - A[1,2]/90
-        M[3,6]=-A[1,3]/90
-        M[3,7]=A[1,2]/90 + A[1,3]/90
-        M[3,8]=-A[1,3]/90
-        M[3,9]=A[1,1]/90 + A[1,3]/90
-        M[3,10]=-A[1,3]/90
-        M[4,4]=-A[1,1]/120 - A[1,2]/120 - A[1,3]/120
-        M[4,5]=-A[1,1]/90 - A[1,2]/90
-        M[4,6]=-A[1,1]/90 - A[1,3]/90
-        M[4,7]=A[1,1]/90 + A[1,2]/90 + A[1,3]/90
-        M[4,8]=-A[1,2]/90 - A[1,3]/90
-        M[4,9]=A[1,1]/90 + A[1,2]/90 + A[1,3]/90
-        M[4,10]=A[1,1]/90 + A[1,2]/90 + A[1,3]/90
-        M[5,5]=2*A[1,1]/45 + 2*A[1,2]/45
-        M[5,6]=A[1,1]/45 + 2*A[1,3]/45
-        M[5,7]=-A[1,1]/45 - 2*A[1,2]/45 - 2*A[1,3]/45
-        M[5,8]=A[1,2]/45 + 2*A[1,3]/45
-        M[5,9]=-2*A[1,1]/45 - A[1,2]/45 - 2*A[1,3]/45
-        M[5,10]=-A[1,1]/45 - A[1,2]/45
-        M[6,6]=2*A[1,1]/45 + 2*A[1,3]/45
-        M[6,7]=-A[1,1]/45 - 2*A[1,2]/45 - 2*A[1,3]/45
-        M[6,8]=2*A[1,2]/45 + A[1,3]/45
-        M[6,9]=-A[1,1]/45 - A[1,3]/45
-        M[6,10]=-2*A[1,1]/45 - 2*A[1,2]/45 - A[1,3]/45
-        M[7,7]=-2*A[1,2]/45 - 2*A[1,3]/45
-        M[7,8]=A[1,2]/45 + A[1,3]/45
-        M[7,9]=-A[1,1]/45 + A[1,2]/45 - A[1,3]/45
-        M[7,10]=-A[1,1]/45 - A[1,2]/45 + A[1,3]/45
-        M[8,8]=2*A[1,2]/45 + 2*A[1,3]/45
-        M[8,9]=-2*A[1,1]/45 - A[1,2]/45 - 2*A[1,3]/45
-        M[8,10]=-2*A[1,1]/45 - 2*A[1,2]/45 - A[1,3]/45
-        M[9,9]=-2*A[1,1]/45 - 2*A[1,3]/45
-        M[9,10]=-A[1,1]/45 - A[1,2]/45 + A[1,3]/45
-        M[10,10]=-2*A[1,1]/45 - 2*A[1,2]/45
-
+        M[2,2]=A[2,2]/10
+        M[2,3]=-A[2,3]/30
+        M[2,4]=A[1,2]/30 + A[2,2]/30 + A[2,3]/30
+        M[2,5]=A[1,2]/10 - A[2,2]/30
+        M[2,6]=-A[1,2]/30 - A[2,3]/30
+        M[2,7]=A[2,2]/30 + A[2,3]/30
+        M[2,8]=-A[2,2]/30 + A[2,3]/10
+        M[2,9]=-A[1,2]/10 - 2*A[2,2]/15 - A[2,3]/10
+        M[2,10]=A[1,2]/30 + A[2,2]/30
+        M[3,3]=A[3,3]/10
+        M[3,4]=A[1,3]/30 + A[2,3]/30 + A[3,3]/30
+        M[3,5]=-A[1,3]/30 - A[2,3]/30
+        M[3,6]=A[1,3]/10 - A[3,3]/30
+        M[3,7]=A[2,3]/30 + A[3,3]/30
+        M[3,8]=A[2,3]/10 - A[3,3]/30
+        M[3,9]=A[1,3]/30 + A[3,3]/30
+        M[3,10]=-A[1,3]/10 - A[2,3]/10 - 2*A[3,3]/15
+        M[4,4]=A[1,1]/10 + A[1,2]/5 + A[1,3]/5 + A[2,2]/10 + A[2,3]/5 + A[3,3]/10
+        M[4,5]=A[1,1]/30 + A[1,2]/15 + A[1,3]/30 + A[2,2]/30 + A[2,3]/30
+        M[4,6]=A[1,1]/30 + A[1,2]/30 + A[1,3]/15 + A[2,3]/30 + A[3,3]/30
+        M[4,7]=-2*A[1,1]/15 - A[1,2]/6 - A[1,3]/6 - A[2,2]/30 - A[2,3]/15 - A[3,3]/30
+        M[4,8]=A[1,2]/30 + A[1,3]/30 + A[2,2]/30 + A[2,3]/15 + A[3,3]/30
+        M[4,9]=-A[1,1]/30 - A[1,2]/6 - A[1,3]/15 - 2*A[2,2]/15 - A[2,3]/6 - A[3,3]/30
+        M[4,10]=-A[1,1]/30 - A[1,2]/15 - A[1,3]/6 - A[2,2]/30 - A[2,3]/6 - 2*A[3,3]/15
+        M[5,5]=4*A[1,1]/15 + 4*A[1,2]/15 + 4*A[2,2]/15
+        M[5,6]=2*A[1,1]/15 + 2*A[1,2]/15 + 2*A[1,3]/15 + 4*A[2,3]/15
+        M[5,7]=-4*A[1,2]/15 - 2*A[1,3]/15 - 4*A[2,2]/15 - 4*A[2,3]/15
+        M[5,8]=2*A[1,2]/15 + 4*A[1,3]/15 + 2*A[2,2]/15 + 2*A[2,3]/15
+        M[5,9]=-4*A[1,1]/15 - 4*A[1,2]/15 - 4*A[1,3]/15 - 2*A[2,3]/15
+        M[5,10]=-2*A[1,1]/15 - 4*A[1,2]/15 - 2*A[2,2]/15
+        M[6,6]=4*A[1,1]/15 + 4*A[1,3]/15 + 4*A[3,3]/15
+        M[6,7]=-2*A[1,2]/15 - 4*A[1,3]/15 - 4*A[2,3]/15 - 4*A[3,3]/15
+        M[6,8]=4*A[1,2]/15 + 2*A[1,3]/15 + 2*A[2,3]/15 + 2*A[3,3]/15
+        M[6,9]=-2*A[1,1]/15 - 4*A[1,3]/15 - 2*A[3,3]/15
+        M[6,10]=-4*A[1,1]/15 - 4*A[1,2]/15 - 4*A[1,3]/15 - 2*A[2,3]/15
+        M[7,7]=4*A[1,1]/15 + 4*A[1,2]/15 + 4*A[1,3]/15 + 4*A[2,2]/15 + 8*A[2,3]/15 + 4*A[3,3]/15
+        M[7,8]=-2*A[2,2]/15 - 4*A[2,3]/15 - 2*A[3,3]/15
+        M[7,9]=4*A[1,2]/15 + 2*A[1,3]/15 + 2*A[2,3]/15 + 2*A[3,3]/15
+        M[7,10]=2*A[1,2]/15 + 4*A[1,3]/15 + 2*A[2,2]/15 + 2*A[2,3]/15
+        M[8,8]=4*A[2,2]/15 + 4*A[2,3]/15 + 4*A[3,3]/15
+        M[8,9]=-2*A[1,2]/15 - 4*A[1,3]/15 - 4*A[2,3]/15 - 4*A[3,3]/15
+        M[8,10]=-4*A[1,2]/15 - 2*A[1,3]/15 - 4*A[2,2]/15 - 4*A[2,3]/15
+        M[9,9]=4*A[1,1]/15 + 4*A[1,2]/15 + 8*A[1,3]/15 + 4*A[2,2]/15 + 4*A[2,3]/15 + 4*A[3,3]/15
+        M[9,10]=2*A[1,1]/15 + 2*A[1,2]/15 + 2*A[1,3]/15 + 4*A[2,3]/15
+        M[10,10]=4*A[1,1]/15 + 8*A[1,2]/15 + 4*A[1,3]/15 + 4*A[2,2]/15 + 4*A[2,3]/15 + 4*A[3,3]/15
         M[2,1]=M[1,2]
         M[3,1]=M[1,3]
         M[4,1]=M[1,4]
@@ -1460,7 +1611,7 @@ function s43nvhnuh(J::CooTrafo)
         M[20,18]=M[18,20]
         M[20,19]=M[19,20]
 
-        return M*abs(J.det)
+        return recombine_hermite(J,M)*abs(J.det)
 end
 
 function s43nv1nu1cc1(J::CooTrafo,c)
@@ -1505,5 +1656,5 @@ function s33v2(J::CooTrafo)
 end
 
 function s33vh(J::CooTrafo)
-        return  [11/120  11/120  11/120  -1/60  1/120  1/120  1/120  -1/60  1/120  9/40]*abs(J.det)
+        return  recombine_hermite(J,[11/120  11/120  11/120  -1/60  1/120  1/120  1/120  -1/60  1/120  0 0 0 9/40])*abs(J.det)
 end

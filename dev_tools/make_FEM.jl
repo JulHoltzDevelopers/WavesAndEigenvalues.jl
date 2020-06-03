@@ -3,10 +3,15 @@ x, y, z,a = SymPy.symbols("x y z a")
 c1, c2, c3, c4, c5, c6, c7, c8, c9, c10 = SymPy.symbols("c1 c2 c3 c4 c5 c6 c7 c8 c9 c10")
 A11, A12, A13, A22, A23, A33 = SymPy.symbols("A11 A12 A13 A22 A23 A33")
 A31, A21, A32 = A13, A12, A23
+B11, B12, B13, B21, B22, B23, B31, B32, B33 = SymPy.symbols("B11 B12 B13 B21 B22 B23 B31 B32 B33")
+
 
 A=SymPy.Matrix([A11 A12 A13;
               A21 A22 A23;
               A31 A32 A33])
+B=SymPy.Matrix([B11 B12 B13;
+                B21 B22 B23;
+                B31 B32 B33])
 
 a=1-x-y-z
 
@@ -56,6 +61,24 @@ fh18=fh_fc(x,z,a)
 fh19=fh_fc(x,y,a)
 fh20=fh_fc(x,y,z)
 
+#recombined implementation
+
+fr05=(B11*fh05+B12*fh09+B13*fh13).simplify()
+fr06=(B11*fh06+B12*fh10+B13*fh14).simplify()
+fr07=(B11*fh07+B12*fh11+B13*fh15).simplify()
+fr08=(B11*fh08+B12*fh12+B13*fh16).simplify()
+
+fr09=(B21*fh05+B22*fh09+B23*fh13).simplify()
+fr10=(B21*fh06+B22*fh10+B23*fh14).simplify()
+fr11=(B21*fh07+B22*fh11+B23*fh15).simplify()
+fr12=(B21*fh08+B22*fh12+B23*fh16).simplify()
+
+fr13=(B31*fh05+B32*fh09+B33*fh13).simplify()
+fr14=(B31*fh06+B32*fh10+B33*fh14).simplify()
+fr15=(B31*fh07+B32*fh11+B33*fh15).simplify()
+fr16=(B31*fh08+B32*fh12+B33*fh16).simplify()
+
+
 
 
 ##
@@ -79,11 +102,13 @@ end
 ##
 #zweiter ordnung
 X=[x,y,z,a]
-F= [[x,y,z,a], [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 ],[fh01, fh02,fh03,fh04,fh05,fh06,fh07,fh08,fh09,fh10,fh11,fh12,fh13,fh14,fh15,fh16,fh17,fh18,fh19,fh20]]
+F= [[x,y,z,a], [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 ],
+    [fh01, fh02,fh03,fh04,fh05,fh06,fh07,fh08,fh09,fh10,fh11,fh12,fh13,fh14,fh15,fh16,fh17,fh18,fh19,fh20],
+    [fh01, fh02,fh03,fh04,fr05,fr06,fr07,fr08,fr09,fr10,fr11,fr12,fr13,fr14,fr15,fr16,fh17,fh18,fh19,fh20]]
 C= [[c1*x, c2*y, c3*z, c4*a,],[c1*f1, c2*f2, c3*f3, c4*f4, c5*f5, c6*f6, c7*f7, c8*f8, c9*f9, c10*f10 ],]
 f = [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 ]
 ff=[f1,f4,f5,f7]
-surf=[[1,2,4],[1,2,4,5,7,9],[1 2 4 5 6 8 9 10 12 19]]
+surf=[[1,2,4],[1,2,4,5,7,9],[1 2 4 5 6 8 9 10 12 13 14 16 19],[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20]]
 
 
 ##
@@ -212,12 +237,10 @@ function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,ty
 
     M=Array{Any}(undef,length(f),length(f))
         for (i,fi) in enumerate(f)
+            if typ==:nabla
+                    fi=grad(fi)
+            end
             for (j,fj) in enumerate(f)
-                if typ==:nabla
-                    if j==1
-                        fi=grad(fi)
-                    end
-                end
                 if symmetric && j<i
                     continue
                 end
@@ -260,12 +283,12 @@ function local_vector(order=1,corder=2, crdnt=0, crdnt_adj=0, typ=:none )
         coeff=sum(C[corder])
     end
     if typ==:boundary
-        f=surf[order]
+        f=f[surf[order]]
     end
 
     M=Array{Any}(undef,length(f))
     for (i,fi) in enumerate(f)
-        if typ==boundary
+        if typ==:boundary
             M[i]=tri_integrate((fi*coeff).subs(z, 0).simplify()).simplify()
         else
             M[i]=tet_integrate(fi*coeff).simplify()
@@ -327,6 +350,17 @@ function print_matrix(M,coeff=false,symmetric=false)
     txt=replace(txt,"A32"=>"A[3,2]")
     txt=replace(txt,"A33"=>"A[3,3]")
 
+    txt=replace(txt,"B11"=>"B[1,1]")
+    txt=replace(txt,"B12"=>"B[1,2]")
+    txt=replace(txt,"B13"=>"B[1,3]")
+    txt=replace(txt,"B21"=>"B[2,1]")
+    txt=replace(txt,"B22"=>"B[2,2]")
+    txt=replace(txt,"B23"=>"B[2,3]")
+    txt=replace(txt,"B31"=>"B[3,1]")
+    txt=replace(txt,"B32"=>"B[3,2]")
+    txt=replace(txt,"B33"=>"B[3,3]")
+
+
     txt=replace(txt,"c1^2"=>"cc[1,1]")
     txt=replace(txt,"c2^2"=>"cc[2,2]")
     txt=replace(txt,"c3^2"=>"cc[3,3]")
@@ -345,14 +379,14 @@ end
 #M =local_matrix(1,0) mass matrix
 #M=local_matrix(1,0,0,3)
 #M=local_matrix(1,diff(sum(C[1]),z),0)
-M=local_matrix(1,sum(C[1])^2,typ=:nabla,symmetric=true)
+M=local_matrix(4,0,typ=:nabla,symmetric=false)
 
 
-txt=print_matrix(M,true,true)
+txt=print_matrix(M,true,false)
 ## vectors
 
-M=local_vector(3,0)
-M[herm_surf]
+M=local_vector(3,0,0,0,:boundary)
+#M[herm_surf]
 ###
 ### derivatives
 function deriv()

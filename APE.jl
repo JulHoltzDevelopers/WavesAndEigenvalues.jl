@@ -2,9 +2,10 @@
 using WavesAndEigenvalues.Meshutils, WavesAndEigenvalues.NLEVP
 import WavesAndEigenvalues.Meshutils: find_smplx, insert_smplx!
 import SparseArrays, LinearAlgebra, ProgressMeter
+import WavesAndEigenvalues
 include("./src/FEM.jl")
 
-#
+
 function collect_triangles(mesh::Mesh)
     inner_triangles=[]
     for tet in mesh.tetrahedra
@@ -33,12 +34,13 @@ function aggregate_elements(mesh::Mesh, el_type=:1)
     if el_type==:1
         tetrahedra=mesh.tetrahedra
         triangles=mesh.triangles
+        dim=N_points
     elseif el_type==:2
-        triangles=Array{UInt32,1}[] #TODO: preallocation?
-        tetrahedra=Array{UInt32,1}[]
+        triangles=Array{Array{UInt32,1}}(undef,length(mesh.triangles))
+        tetrahedra=Array{Array{UInt32,1}}(undef,length(mesh.tetrahedra))
         tet=Array{UInt32}(undef,10)
         tri=Array{UInt32}(undef,6)
-        for (idx,smplx) in enumerate(mesh.tetrahedra) #TODO: no enumeration
+        for (idx,smplx) in enumerate(mesh.tetrahedra)
             tet[1:4]=smplx[:]
             tet[5]=get_line_idx(mesh,smplx[[1,2]])+N_points#find_smplx(mesh.lines,smplx[[1,2]])+N_points #TODO: type stability
             tet[6]=get_line_idx(mesh,smplx[[1,3]])+N_points
@@ -46,61 +48,91 @@ function aggregate_elements(mesh::Mesh, el_type=:1)
             tet[8]=get_line_idx(mesh,smplx[[2,3]])+N_points
             tet[9]=get_line_idx(mesh,smplx[[2,4]])+N_points
             tet[10]=get_line_idx(mesh,smplx[[3,4]])+N_points
-            push!(tetrahedra,copy(tet))
+            tetrahedra[idx]=copy(tet)
         end
         for (idx,smplx) in enumerate(mesh.triangles)
             tri[1:3]=smplx[:]
             tri[4]=get_line_idx(mesh,smplx[[1,2]])+N_points
             tri[5]=get_line_idx(mesh,smplx[[1,3]])+N_points
             tri[6]=get_line_idx(mesh,smplx[[2,3]])+N_points
-            push!(triangles,copy(tri))
+            triangles[idx]=copy(tri)
         end
+        dim=N_points+length(mesh.lines)
     elseif el_type==:h
         #if mesh.tri2tet[1]==0xffffffff
         #    link_triangles_to_tetrahedra!(mesh)
         #end
         inner_triangles=collect_triangles(mesh) #TODO integrate into mesh structure
-        triangles=Array{Any}(undef,length(mesh.triangles))
-        tetrahedra=Array{Any}(undef,length(mesh.tetrahedra))
+        triangles=Array{Array{UInt32,1}}(undef,length(mesh.triangles))
+        tetrahedra=Array{Array{UInt32,1}}(undef,length(mesh.tetrahedra))
         tet=Array{UInt32}(undef,20)
-        tri=Array{UInt32}(undef,10)
+        tri=Array{UInt32}(undef,13)
         for (idx,smplx) in enumerate(mesh.triangles)
             tri[1:3]  =  smplx[:]
-            tri[4:6]  =  smplx[:]+N_points
-            tri[7:9]  =  smplx[:]+2*N_points
+            tri[4:6]  =  smplx[:].+N_points
+            tri[7:9]  =  smplx[:].+2*N_points
+            tri[10:12]  =  smplx[:].+3*N_points
             fcidx     =  find_smplx(mesh.triangles,smplx)
             if fcidx !=0
-                tri[10]   =  fcidx+3*N_points
-            elseif
-                tri[10]   =  find_smplx(inner_triangles,smplx)+3*N_points+length(mesh.triangles)
+                tri[13]   =  fcidx+4*N_points
+            else
+                tri[13]   =  find_smplx(inner_triangles,smplx)+4*N_points+length(mesh.triangles)
             end
             triangles[idx]=copy(tri)
         end
         for (idx, smplx) in enumerate(mesh.tetrahedra)
             tet[1:4] = smplx[:]
-            tet[5:8] = smplx[:]+N_points
-            tet[9:12] = smplx[:]+2*N_points
-            tet[13:16]= smplx[:]+3*N_points
+            tet[5:8] = smplx[:].+N_points
+            tet[9:12] = smplx[:].+2*N_points
+            tet[13:16]= smplx[:].+3*N_points
 
-            for (jdx,tria) in enumerate(smplx[[1,2,3]],smplx[[1,2,4]],smplx[[1,3,4]],smplx[[2,3,4]])
+            for (jdx,tria) in enumerate([smplx[[2,3,4]],smplx[[1,3,4]],smplx[[1,2,4]],smplx[[1,2,3]]])
                 fcidx     =  find_smplx(mesh.triangles,tria)
                 if fcidx !=0
-                    tet[16+jdx]   =  fcidx+3*N_points
-                elseif
-                    tet[16+jdx]   =  find_smplx(inner_triangles,tria)+3*N_points+length(mesh.triangles)
+                    tet[16+jdx]   =  fcidx+4*N_points
+                else
+                    fcidx=find_smplx(inner_triangles,tria)
+                    if fcidx==0
+                        println("Error, face not found!!!")
+                        return nothing
+                    end
+                    tet[16+jdx]   =  fcidx+4*N_points+length(mesh.triangles)
                 end
             end
             tetrahedra[idx]=copy(tet)
         end
+        dim=N_points*4+length(mesh.triangles)+length(inner_triangles)
     end
-    return triangles, tetrahedra
+    return triangles, tetrahedra, dim
 end
 
 
-function potflow(mesh::Mesh,dscrp)
-    triangles, tetrahedra = aggregate_elements(mesh,2)
-    N_points=size(mesh.points)[2]
-    dim=deepcopy(N_points)+length(mesh.lines)
+function potflow(mesh::Mesh,dscrp,order)
+    triangles, tetrahedra, dim = aggregate_elements(mesh,order)
+    function s43nvnu(J)
+        if order==:1
+            return s43nv1nu1(J)
+        elseif order==:2
+            return s43nv2nu2(J)
+        elseif order==:h
+            return s43nvhnuh(J)
+        else
+            return nothing #force crash
+        end
+    end
+    function s33v(J)
+        if order==:1
+            return s33v1(J)
+        elseif order==:2
+            return s33v2(J)
+        elseif order==:h
+            return s33vh(J)
+        else
+            return nothing #force crash
+        end
+    end
+
+
     MM=Float64[]
     II=Int64[]
     JJ=Int64[]
@@ -108,7 +140,7 @@ function potflow(mesh::Mesh,dscrp)
     for smplx in tetrahedra
         J=CooTrafo(mesh.points[:,smplx[1:4]])
         ii, jj =create_indices(smplx)
-        mm=s43nv2nu2(J)
+        mm=s43nvnu(J)
         append!(MM,mm[:])
         append!(II,ii[:])
         append!(JJ,jj[:])
@@ -124,7 +156,7 @@ function potflow(mesh::Mesh,dscrp)
         II=Int64[]
         for smplx in triangles[simplices]
             J=CooTrafo(mesh.points[:,smplx[1:3]])
-            mm=-s33v2(J)*a
+            mm=-s33v(J)*a
             v[smplx[:]]+=mm[:]
         end
     end
@@ -140,7 +172,7 @@ function discretize(mesh::Mesh)
     P=101325
     ρ=1.225
     γ=1.4
-    Y=1E15
+    Y=0*1E15
 
     #Boundary matrix
     L.params[:Y]=Y
@@ -277,6 +309,8 @@ function discretize(mesh::Mesh)
 
 end
 
+
+
 #end #module
 ##
 mesh=Mesh("./examples/tutorials/Rijke_mm.msh",scale=0.001)
@@ -284,8 +318,15 @@ mesh=Mesh("./examples/tutorials/Rijke_mm.msh",scale=0.001)
 dscrp=Dict()
 dscrp["Outlet"]=1.0
 dscrp["Inlet"]=-1.0
-L,v=potflow(mesh,dscrp)
+L,v=potflow(mesh,dscrp,:1)
 phi=L\v
+##
+data=Dict()
+data["p1"]=phi1[1:size(mesh.points,2)]
+data["p2"]=phi2[1:size(mesh.points,2)]
+data["ph"]=phih[1:size(mesh.points,2)]
+vtk_write("potential",mesh,data)
+
 ##
 for smplx in mesh.tetrahedra
     J=CooTrafo(mesh.points[:,smplx])
@@ -294,7 +335,7 @@ end
 ##
 L=discretize(mesh)
 ##
-sol,nn,flag=householder(L,500*2*pi,output=true,maxiter=30,tol=1E-10);
+sol,nn,flag=householder(L,670*2*pi,output=true,maxiter=30,tol=1E-10);
 ##
 tri=mesh.triangles[1]
 X=mesh.points[:,tri]
