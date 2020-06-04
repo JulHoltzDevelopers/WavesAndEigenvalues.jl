@@ -1,0 +1,9 @@
+This folder contains the files needed to build automatically a documentation for the pkg.
+It can also be used to run test (doctests in docstrings).
+It relies on the Documenter Pkg, which can be installed via
+pkg> add Documenter
+
+A basic but good guide can be found here:
+https://juliadocs.github.io/Documenter.jl/stable/man/guide/
+
+The src file containes markdown code used to build the final document (in pdf or html)
