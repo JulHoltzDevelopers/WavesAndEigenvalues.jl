@@ -1,10 +1,8 @@
 using Documenter
-#AO: I need these two lines to build docs for the LOCAL version
 using Pkg
-Pkg.activate("../../WavesAndEigenvalues_devel/")
+Pkg.activate("./")
 using WavesAndEigenvalues
 
-push!(LOAD_PATH,"../src/")
 
 makedocs(
     format = Documenter.HTML(
@@ -24,4 +22,8 @@ makedocs(
      "load_mesh.md",
      ],
  ],
+)
+
+deploydocs(
+    repo = "github.com/JulHoltzDevelopers/WavesAndEigenvalues_Private.git"
 )
