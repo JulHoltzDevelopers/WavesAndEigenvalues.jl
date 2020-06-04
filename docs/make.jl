@@ -1,6 +1,6 @@
 using Documenter
 using Pkg
-Pkg.activate("../")
+Pkg.activate("./")
 using WavesAndEigenvalues
 
 makedocs(
