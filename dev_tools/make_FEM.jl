@@ -306,19 +306,19 @@ end
 
 ##
 N=4
-function print_matrix(M,coeff=false,symmetric=false)
+function print_matrix(M,coeff=false,symmetric=false;diff="")
     N=size(M,1)
     if coeff
         txt=""
         for i=1:N
             for j=(symmetric ? i : 1) : N
-                txt*="M[$i,$j]="*string(M[i,j])*"\n"
+                txt*="M$diff[$i,$j]="*string(M[i,j])*"\n"
             end
         end
         if symmetric
             for i=1:N
                 for j=i+1:N
-                    txt*="M[$j,$i]=M[$i,$j]\n"
+                    txt*="M$diff[$j,$i]=M$diff[$i,$j]\n"
                 end
             end
         end
@@ -379,10 +379,10 @@ end
 #M =local_matrix(1,0) mass matrix
 #M=local_matrix(1,0,0,3)
 #M=local_matrix(1,diff(sum(C[1]),z),0)
-M=local_matrix(4,0,typ=:nabla,symmetric=false)
+M=local_matrix(2,1,3,typ=:diff,symmetric=false)
 
 
-txt=print_matrix(M,true,false)
+txt=print_matrix(M,true,false,diff="3")
 ## vectors
 
 M=local_vector(3,0,0,0,:boundary)

@@ -165,7 +165,7 @@ end
 
 
 ##
-function discretize(mesh::Mesh)
+function discretize(mesh::Mesh,U)
     L=LinearOperatorFamily(["ω","λ"],complex([0.,Inf]))
     N_points=size(mesh.points)[2]
     dim=deepcopy(N_points)
@@ -193,7 +193,6 @@ function discretize(mesh::Mesh)
 
 
 
-
     #Term II and IV
     MM=ComplexF64[]
     II=Int64[]
@@ -203,39 +202,21 @@ function discretize(mesh::Mesh)
         ii, jj =create_indices(tet)
 
 
-        #TERM II
-        #u†p
-        mm=s43v1du1(J,1)
-        append!(MM,mm[:])
-        append!(II,ii[:].+0*dim)
-        append!(JJ,jj[:].+3*dim)
 
-        #v†p
-        mm=s43v1du1(J,2)
-        append!(MM,mm[:])
-        append!(II,ii[:].+1*dim)
-        append!(JJ,jj[:].+3*dim)
+        for dd=1:3
+            #TERM II
+            #u†p
+            mm=s43v1du1(J,dd)
+            append!(MM,mm[:])
+            append!(II,ii[:].+(dd-1)*dim)
+            append!(JJ,jj[:].+3*dim)
 
-        #w†p
-        mm=s43v1du1(J,3)
-        append!(MM,mm[:])
-        append!(II,ii[:].+2*dim)
-        append!(JJ,jj[:].+3*dim)
-
-
-        #termIV
-        mm=-γ*P*s43dv1u1(J,1) #TODO: space-dependent P
-        append!(MM,mm[:])
-        append!(II,ii[:].+3*dim)
-        append!(JJ,jj[:].+0*dim)
-        mm=-γ*P*s43dv1u1(J,2) #TODO: space-dependent P
-        append!(MM,mm[:])
-        append!(II,ii[:].+3*dim)
-        append!(JJ,jj[:].+1*dim)
-        mm=-γ*P*s43dv1u1(J,3) #TODO: space-dependent P
-        append!(MM,mm[:])
-        append!(II,ii[:].+3*dim)
-        append!(JJ,jj[:].+2*dim)
+            #termIV
+            mm=-γ*P*s43dv1u1(J,dd) #TODO: space-dependent P
+            append!(MM,mm[:])
+            append!(II,ii[:].+3*dim)
+            append!(JJ,jj[:].+(dd-1)*dim)
+        end
     end
     M=SparseArrays.sparse(II,JJ,MM,4*dim,4*dim)
     push!(L,Term(M,(),(),"","K"))
@@ -252,17 +233,11 @@ function discretize(mesh::Mesh)
         ii, jj =create_indices(tet)
 
         #u
-        append!(MM,mm[:])
-        append!(II,ii[:].+0*dim)
-        append!(JJ,jj[:].+0*dim)
-        #v
-        append!(MM,mm[:])
-        append!(II,ii[:].+1*dim)
-        append!(JJ,jj[:].+1*dim)
-        #w
-        append!(MM,mm[:])
-        append!(II,ii[:].+2*dim)
-        append!(JJ,jj[:].+2*dim)
+        for dd=1:3
+            append!(MM,mm[:])
+            append!(II,ii[:].+(dd-1)*dim)
+            append!(JJ,jj[:].+(dd-1)*dim)
+        end
 
         #pressure component Term III
         mm=s43v1u1(J)
@@ -275,9 +250,38 @@ function discretize(mesh::Mesh)
     push!(L,Term(1.0im*M,(pow1,),((:ω,),),"iω","M"))
 
 
+    #term V and VI (mean flow)
+    MM=ComplexF64[]
+    II=Int64[]
+    JJ=Int64[]
+    for tet in mesh.tetrahedra
+        J=CooTrafo(mesh.points[:,tet])
+        ii, jj =create_indices(tet)
+        #term V
+        for dd=1:3
+            u=U[dd,tet]
+            mtx=s43v1du1c1(J,u,dd)
+            mm=ρ*(s43diffc1(J,u,dd)*s43v1u1(J)+mtx)
+            append!(MM,mm[:])
+            append!(II,ii[:].+(dd-1)*dim)
+            append!(JJ,jj[:].+(dd-1)*dim)
+
+            #term IV
+            append!(MM,mtx[:])
+            append!(II,ii[:].+3*dim)
+            append!(JJ,jj[:].+3*dim)
+        end
+    end
+    L.params[:v]=0.0
+    M=SparseArrays.sparse(II,JJ,MM,4*dim,4*dim)
+    push!(L,Term(M,(pow1,),((:v,),),"v","U"))
+
 
 
     #grid mass matrix
+    MM=ComplexF64[]
+    II=Int64[]
+    JJ=Int64[]
     for tet in mesh.tetrahedra
         J=CooTrafo(mesh.points[:,tet])
         mm=s43v1u1(J)
@@ -296,17 +300,14 @@ function discretize(mesh::Mesh)
         append!(II,ii[:].+2*dim)
         append!(JJ,jj[:].+2*dim)
 
-        #pressure component Term III
+        #pressure component Te÷rm III
         append!(MM,mm[:])
         append!(II,ii[:].+3*dim)
         append!(JJ,jj[:].+3*dim)
     end
-        M=SparseArrays.sparse(II,JJ,MM,4*dim,4*dim)
+    M=SparseArrays.sparse(II,JJ,MM,4*dim,4*dim)
     push!(L,Term(-M,(pow1,),((:λ,),),"-λ","__aux__"))
-
     return L#II,JJ,MM,M
-
-
 end
 
 
@@ -318,24 +319,18 @@ mesh=Mesh("./examples/tutorials/Rijke_mm.msh",scale=0.001)
 dscrp=Dict()
 dscrp["Outlet"]=1.0
 dscrp["Inlet"]=-1.0
-L,v=potflow(mesh,dscrp,:1)
+L,v=potflow(mesh,dscrp,:h)
 phi=L\v
-##
-data=Dict()
-data["p1"]=phi1[1:size(mesh.points,2)]
-data["p2"]=phi2[1:size(mesh.points,2)]
-data["ph"]=phih[1:size(mesh.points,2)]
-vtk_write("potential",mesh,data)
+N_points=size(mesh.points,2)
+u=Array{Float64}(undef,3,N_points)
+u[1,:]=phi[0*N_points+1:1*N_points]
+u[2,:]=phi[1*N_points+1:2*N_points]
+u[3,:]=phi[2*N_points+1:3*N_points]
 
 ##
-for smplx in mesh.tetrahedra
-    J=CooTrafo(mesh.points[:,smplx])
-    sum(J.inv\phi[smplx] #ZODO: Hier weitermachen
-end
+L=discretize(mesh,u)
 ##
-L=discretize(mesh)
-##
-sol,nn,flag=householder(L,670*2*pi,output=true,maxiter=30,tol=1E-10);
+sol,nn,flag=householder(L,670*1*pi,output=true,maxiter=10,tol=1E-10);
 ##
 tri=mesh.triangles[1]
 X=mesh.points[:,tri]

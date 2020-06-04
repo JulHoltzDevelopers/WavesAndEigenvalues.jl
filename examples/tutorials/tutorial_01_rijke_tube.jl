@@ -37,14 +37,14 @@
 # conduct a thermo-acoustic stability analysis
 
 
-## #src
+## #jl
 
 # ##Header
 #First you will need to load the Helmholtz solver. The following line brings all
 # necessary tools into scope:
 using WavesAndEigenvalues.Helmholtz
 
-## #src
+## #jl
 # ##Mesh
 # Now we can load the mesh file. It is the essential piece of information
 # defining the domain shape . This tutorial's mesh has been specified in mm
@@ -132,7 +132,7 @@ dscrp["Flame"]=(:flame,(γ,ρ,Q02U0,x_ref,n_ref,:n,:τ,n,τ))
 # Note that the order of the values in the options tuple is important. Also note
 # that we assign the symbols `:n`and `:τ` for later analysis.
 
-## #src
+## #jl
 # ## Speed of Sound
 # The description of the Rijke tube model is nearly complete. We just need to
 # specify the speed of sound field.  For this example, the field is fairly

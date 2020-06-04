@@ -56,9 +56,12 @@ function helmhol(mesh,order)
     return L
 end
 ##
-L=helmhol(mesh,:h)
+L=helmhol(mesh,:)
 ##
 sol,nn,flag=householder(L,340*2*pi,maxiter=5,output=true)
+data=Dict()
+data["bla"]=real.(sol.v)
+vtk_write("tube",mesh,data)
 ##
 c=ones(length(mesh.tetrahedra))*347
 c=ones(size(mesh.points,2))*347
