@@ -3,6 +3,7 @@ using Pkg
 Pkg.activate("./")
 using WavesAndEigenvalues
 
+
 makedocs(
     format = Documenter.HTML(
             prettyurls = false,
