@@ -23,3 +23,7 @@ makedocs(
      ],
  ],
 )
+
+deploydocs(
+    repo = "github.com/JulHoltzDevelopers/WavesAndEigenvalues_Private.git"
+)
