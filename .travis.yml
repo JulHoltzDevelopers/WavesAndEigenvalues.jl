@@ -9,7 +9,7 @@ jobs:
       julia: 1.4
       os: linux
       script:
-        - julia --project --check-bounds=yes -e 'import Pkg; Pkg.build(); Pkg.test("WavesAndEigenvalues"; coverage=true)'
+        - julia --project --check-bounds=yes -e 'import Pkg; Pkg.build()'
         - julia --color=yes --project=docs/ -e 'using Pkg; Pkg.instantiate()'
         - julia --color=yes --project=docs/ docs/make.jl
       after_success: skip   
