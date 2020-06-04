@@ -25,5 +25,6 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/JulHoltzDevelopers/WavesAndEigenvalues.jl.git"
-)
+    repo = "github.com/JulHoltzDevelopers/WavesAndEigenvalues.jl.git",
+    push_preview=true
+    )

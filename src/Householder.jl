@@ -64,7 +64,7 @@ Thus, with a higher order less iterations will be necessary. However, the comput
 
 [2] G.A. Mensah, Efficient Computation of Thermoacoustic Modes, Ph.D. Thesis, TU Berlin, 2019
 
-See also: [`juniper`](@ref), [`nicoud`](@ref), [`picard`](@ref), [`beyn`](@ref),
+See also: [`beyn`](@ref),
 """
 function householder(L,z;maxiter=10,tol=0.,relax=1.,lam_tol=0.,order=1,n_eig_val=1,v0=[],output=true)
     if output
