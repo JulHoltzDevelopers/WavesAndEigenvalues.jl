@@ -1,7 +1,7 @@
 using Documenter
 #AO: I need these two lines to build docs for the LOCAL version
-using Pkg
-Pkg.activate("../../WavesAndEigenvalues_devel/")
+#using Pkg
+#Pkg.activate("../WavesAndEigenvalues_devel/")
 using WavesAndEigenvalues
 
 push!(LOAD_PATH,"../src/")
