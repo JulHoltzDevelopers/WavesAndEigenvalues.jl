@@ -1,7 +1,3 @@
-```@meta
-EditURL = "<unknown>/tutorial_01_rijke_tube.jl"
-```
-
 # Tutorial 01 Rijke Tube
 
 ##Introduction
