@@ -1,7 +1,7 @@
 # WavesAndEigenvalues.jl
 *Julia package for handling various wave-equations and (non-linear) eigenvalue problems.*
 
-[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://JulHoltzDevelopers/WavesAndEigenvalues.jl/dev)
+[![](https://img.shields.io/badge/docs-stable-blue.svg)](https://julholtzdevelopers.github.io/WavesAndEigenvalues.jl/dev)
 
 ## Disclaimer
 The current version is not final and there are still some features to add, clean-up to be done, and open documentation tasks.
