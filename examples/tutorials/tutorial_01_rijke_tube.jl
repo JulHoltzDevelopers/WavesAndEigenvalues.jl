@@ -1,5 +1,5 @@
-## Tutorial 01 Rijke Tube
-#
+# # Tutorial 01 Rijke Tube
+
 # ##Introduction
 #
 # A Rijke tube is the most simple thermo-acoustic configuration. It comprises a
