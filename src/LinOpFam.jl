@@ -280,8 +280,8 @@ function(L::LinearOperatorFamily)(args...;oplist=[],in_or_ex=false)
   coeff=spzeros(size(L.terms[1].coeff)...)  #TODO: improve this to handle more flexible matrices
 
   for term in L.terms
-    if (!in_or_ex && term.operator in oplist) || (in_or_ex && !(term.operator in oplist)) || (L.mode!=:householder && term.operator=="__aux__")  #TODO: consider deprecating this feature together with nicoud and picard
-      continue
+    if (!in_or_ex && term.operator in oplist) || (in_or_ex && !(term.operator in oplist)) || (L.mode!=:householder && term.operator=="__aux__")
+    	continue
     end
 
     #check whteher term is constant w.r.t. to some parameter then deriv is 0 thus continue
