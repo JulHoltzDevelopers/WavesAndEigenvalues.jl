@@ -35,6 +35,7 @@ Depth = 2
 ```@contents
 Pages =[
         "load_mesh.md",
+	"tutorial_01_rijke_tube.md",
 ]
 Depth = 1
 ```
