@@ -1,7 +1,7 @@
 name = "WavesAndEigenvalues"
 uuid = "a73532ca-c7c2-4c65-85c3-8d67803e4c1d"
 authors = ["Georg A. Mensah <gmensah@ethz.ch>", "Alessandro Orchini"]
-repo = "https://github.com/JulHoltzDevelopers/WavesAndEigenvalues.jl.git"
+url = "https://github.com/JulHoltzDevelopers/WavesAndEigenvalues.jl.git"
 version = "0.1.2"
 
 [deps]
