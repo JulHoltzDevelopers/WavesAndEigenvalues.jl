@@ -281,7 +281,7 @@ function(L::LinearOperatorFamily)(args...;oplist=[],in_or_ex=false)
 
   for term in L.terms
     if (!in_or_ex && term.operator in oplist) || (in_or_ex && !(term.operator in oplist)) || (L.mode!=:householder && term.operator=="__aux__")
-      continue
+    	continue
     end
 
     #check whteher term is constant w.r.t. to some parameter then deriv is 0 thus continue
