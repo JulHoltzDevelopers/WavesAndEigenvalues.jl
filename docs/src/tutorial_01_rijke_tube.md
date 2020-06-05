@@ -2,9 +2,7 @@
 EditURL = "<unknown>/tutorial_01_rijke_tube.jl"
 ```
 
-```@example tutorial_01_rijke_tube
 # Tutorial 01 Rijke Tube
-```
 
 ##Introduction
 
