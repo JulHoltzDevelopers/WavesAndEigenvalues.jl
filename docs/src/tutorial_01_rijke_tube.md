@@ -48,7 +48,7 @@ conduct a thermo-acoustic stability analysis
 necessary tools into scope:
 
 ```@example tutorial_01_rijke_tube
-pwd()
+print(pwd())
 using WavesAndEigenvalues.Helmholtz
 ```
 
