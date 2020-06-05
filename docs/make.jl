@@ -20,6 +20,7 @@ makedocs(
      ],
      "Examples" => Any[
      "load_mesh.md",
+     "tutorial_01_rijke_tube.md",
      ],
  ],
 )
