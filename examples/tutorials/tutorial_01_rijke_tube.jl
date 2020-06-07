@@ -1,6 +1,6 @@
-## Tutorial 01 Rijke Tube
+# # Tutorial 01 Rijke Tube
 #
-# ##Introduction
+# ## Introduction
 #
 # A Rijke tube is the most simple thermo-acoustic configuration. It comprises a
 # tube with an unsteady heat source somewhere inside the tube. This example will
@@ -8,7 +8,7 @@
 # Helmholtz-solver stability analysis.
 
 
-# ###The Helmholtz equation
+# ### The Helmholtz equation
 # The Helmholtz equation is the Fourier transform of the acoustic wave equation.
 # Given that there is a heat source, it reads:
 #
@@ -18,7 +18,7 @@
 # ω the (complex) frequency of the problem, i the imaginary unit, γ the ratio of
 # specifc heats, and q̂ the amplitude of the heat release fluctuation.
 #
-# (Note that the Fourier transform here follows a ⋅' --> ⋅̂ exp(+iωt) convention.)
+# (Note that the Fourier transform here follows a f'(t) --> f̂(ω)exp(+iωt) convention.)
 #
 # Together with some boundary conditions the Helmholtz equation models
 # thermo-acoustic resonance in a cavity. The minimum required inputs to specify
@@ -28,7 +28,7 @@
 # 2. the speed-of-sound field
 # 3. the boundary conditions
 #
-# In case of an active flame (q̂!=0). We will also need
+# In case of an active flame (q̂≠0). We will also need
 #
 # 4. some additional gas porperties and
 # 5. and a flame response model linking the heat release fluctuations q̂ to the pressure fluctuations p̂
@@ -39,13 +39,13 @@
 
 ## #jl
 
-# ##Header
-#First you will need to load the Helmholtz solver. The following line brings all
+# ## Header
+# First you will need to load the Helmholtz solver. The following line brings all
 # necessary tools into scope:
 using WavesAndEigenvalues.Helmholtz
 
 ## #jl
-# ##Mesh
+# ## Mesh
 # Now we can load the mesh file. It is the essential piece of information
 # defining the domain shape . This tutorial's mesh has been specified in mm
 # which is why we scale it by `0.001` to load the coordinates as m:
@@ -75,7 +75,7 @@ print(mesh)
 # operator.
 
 ## #src
-# ##Model set-up
+# ## Model set-up
 # For instance, we certainly want to build the wave operator on the entire mesh.
 # So first, we initialize an empty dictionairy
 dscrp=Dict()
@@ -124,7 +124,7 @@ Q02U0=P0*(Tb/Tu-1)*A*γ/(γ-1) #the ratio of mean heat release to mean velocity 
 # been taken and the direction of that velocity
 x_ref=[0.0; 0.0; -0.00101]
 n_ref=[0.0; 0.0; 1.00] #must be a unit vector
-#And of course, we need some values for n and tau
+# And of course, we need some values for n and tau
 n=0.0 #interaction index
 τ=0.001 #time delay
 # With these values the specification of the flame reads
@@ -167,8 +167,8 @@ print(L)
 # frequency of the model and `λ` an auxiliary value that is important for the
 # eigenfrequency computation.
 ## #src
-# ##Solving the Model
-# ###Global Solver
+# ## Solving the Model
+# ### Global Solver
 # We can solve the model for some eigenvalues using one of the eigenvalue
 # solvers. The package provides you with two types of eigenvalue solvers. A global
 # contour-integration-based solver. That finds you all eigenvalues inside of a
@@ -188,38 +188,38 @@ for ω in Ω
     println("Frequency: $(ω/2/pi)")
 end
 ## #src
-# ###Local Solver
+# ### Local Solver
 # To get high accuracy eigenvalues , there is also local iterative eigenvalue
 # solver. Based on an initial guess, it only finds you one eigenvalue at a time
 # but with machine-precise accuracy.
 sol,nn,flag=householder(L,250*2*pi,output=true);
 
 # The return values of this solver are a solution object `sol`, the number of
-# iterations `nn` performed by the solver and and error flag `flag` providing
+# iterations `nn` performed by the solver and an error flag `flag` providing
 # information on the quality of the solution. If `flag>0` the solution has
 # converged. If `flag<0`something went wrong. And if `flag==0`... well, probably
 # the solution is fine but you should check it.
 #
 # In the current case the flag is -1 indicating that the maximum number of
-# iterations has been reached. This is because we havent specified a stopping
-# criterion and the iteration just run for the maximum number of iterations.
+# iterations has been reached. This is because we haven't specified a stopping
+# criterion and the iteration just ran for the maximum number of iterations.
 # Nevertheless, the 272 Hz mode is correct. Indeed, as you can see from the
 # printed output it already converged to machine-precision after 5 iterations.
 
 ## #src
 # ## Changing a specified parameter.
 #
-#Remember that we have specified the parameters `Y`,`n`, and `τ`?. We can change
-#these easily without rediscretizing our model. For instance currently `n==0.0`
-#so the solution is purely accoustic. The effect of the flame just enters the
-#problem via the speed of sound field (this is known as passive flame). By
-#setting the interaction index to `1.0` we activate the flame.
+# Remember that we have specified the parameters `Y`,`n`, and `τ`?. We can change
+# these easily without rediscretizing our model. For instance currently `n==0.0`
+# so the solution is purely accoustic. The effect of the flame just enters the
+# problem via the speed of sound field (this is known as passive flame). By
+# setting the interaction index to `1.0` we activate the flame.
 L.params[:n]=1.0
-#Now we can just solve the model again to get the active solutions
+# Now we can just solve the model again to get the active solutions
 sol_actv,nn,flag=householder(L,250*2*pi,output=true);
-#The eigenfrequency is now complex:
+# The eigenfrequency is now complex:
 sol_actv.params[:ω]/2/pi
-#with a growth rate `-imag(sol_actv.params[:ω]/2/pi)≈  59.22`
+# with a growth rate `-imag(sol_actv.params[:ω]/2/pi)≈  59.22`
 
 # Instead of recomputing the eigenvalue by one of the solvers. We can also
 # approximate the eigenvalue as a function of one of the model parameters
@@ -231,11 +231,11 @@ freq(n)=sol(:n,n,15,15)/2/pi #create some function for convenience
 freq(1) #evaluate the function at any value for `n` you are interested in.
 
 # The method is slow when only computing one eigenvalue. But its computational
-# costs are allmost constant when computing multiple eigenvalues. Therefore,
+# costs are almost constant when computing multiple eigenvalues. Therefore,
 # for larger parametric studies this is clearly the method of choice.
 
 ## #src
-# ##VTK Output for Paraview
+# ## VTK Output for Paraview
 #
 # To visualizte your solutions you can store them as `"*.vtu"` files to open
 # them with paraview. Just, create a dictionairy, where your modes are stored as
@@ -249,19 +249,19 @@ vtk_write("tutorial_01", mesh, data) # Write the solution to paraview
 
 # The `vtk_write` function automatically sorts your data by its interpolation
 # scheme. Data that is constant on a tetrahedron will be written to a file
-# "*_const.vtu", data that is linearly interpolated on a tetrahedron will go
-# to "*_lin.vtu", and data that is quadratically interpolated to "*_quad.vtu".
+# `*_const.vtu`, data that is linearly interpolated on a tetrahedron will go
+# to `*_lin.vtu`, and data that is quadratically interpolated to `*_quad.vtu`.
 # The current example uses constant speed of sound on a tetrahedron and linear
 # finite elements for the discretization of p. Therefore, two files are
-# generated, namely "tutorial_01_const.vtu" containing the speed-of-sound field
-# and "tutorial_01_lin.vtu" containing the mode shape. Open them with paraview
+# generated, namely `tutorial_01_const.vtu` containing the speed-of-sound field
+# and `tutorial_01_lin.vtu` containing the mode shape. Open them with paraview
 # and have a look!.
 
 ## src
-# ##Summary
+# ## Summary
 #
 # You learnt how to set-up a simple Rijke-tube study. This  already introduced
 # all basic steps that are needed to work with the Helmholtz solver. However,
-# their are a lot of details you can fine tune and even features that weren't
+# there are a lot of details you can fine tune and even features that weren't
 # mentioned in this tutorial. The next tutorials will introduce these aspects in
 # more detail.

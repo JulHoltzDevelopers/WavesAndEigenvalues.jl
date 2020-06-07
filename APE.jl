@@ -175,21 +175,30 @@ function discretize(mesh::Mesh,U)
     Y=0*1E15
 
     #Boundary matrix
-    L.params[:Y]=Y
-    MM=ComplexF64[]
-    II=Int64[]
-    JJ=Int64[]
-    smplx_list=mesh.domains["Outlet"]["simplices"]
-    for tri in mesh.triangles[smplx_list]
-        J=CooTrafo(mesh.points[:,tri])
-        ii, jj =create_indices(tri)
-        mm=sqrt(γ*P/ρ)*s33v1u1(J)
-        append!(MM,mm[:])
-        append!(II,ii[:].+3*dim)
-        append!(JJ,jj[:].+3*dim)
-    end
+
+    for dom in ("Inlet","Outlet")
+        if dom=="Inlet"
+            Ysym=:Y_in
+        elseif dom =="Outlet"
+            Ysym=:Y_out
+        end
+        L.params[Ysym]=Y
+
+        MM=ComplexF64[]
+        II=Int64[]
+        JJ=Int64[]
+        smplx_list=mesh.domains[dom]["simplices"]
+        for tri in mesh.triangles[smplx_list]
+            J=CooTrafo(mesh.points[:,tri])
+            ii, jj =create_indices(tri)
+            mm=sqrt(γ*P/ρ)*s33v1u1(J)
+            append!(MM,mm[:])
+            append!(II,ii[:].+3*dim)
+            append!(JJ,jj[:].+3*dim)
+        end
         M=SparseArrays.sparse(II,JJ,MM,4*dim,4*dim)
-    push!(L,Term(M,(pow1,),((:Y,),),"Y","B"))
+        push!(L,Term(M,(pow1,),((Ysym,),),string(Ysym),"B"))
+    end
 
 
 
@@ -321,21 +330,26 @@ dscrp["Outlet"]=1.0
 dscrp["Inlet"]=-1.0
 L,v=potflow(mesh,dscrp,:h)
 phi=L\v
+##
 N_points=size(mesh.points,2)
 u=Array{Float64}(undef,3,N_points)
-u[1,:]=phi[0*N_points+1:1*N_points]
-u[2,:]=phi[1*N_points+1:2*N_points]
-u[3,:]=phi[2*N_points+1:3*N_points]
+#u[1,:]=zeros(N_points)#phi[0*N_points+1:1*N_points]
+#u[2,:]=zeros(N_points)#phi[1*N_points+1:2*N_points]
+#u[3,:]=ones(N_points)#phi[2*N_points+1:3*N_points]
+u[1,:]=phi[1*N_points+1:2*N_points]
+u[2,:]=phi[2*N_points+1:3*N_points]
+u[3,:]=phi[3*N_points+1:4*N_points]
+A=mesh.domains["Inlet"]["size"]
 
 ##
 L=discretize(mesh,u)
 ##
-sol,nn,flag=householder(L,670*1*pi,output=true,maxiter=10,tol=1E-10);
+L.params[:Y_in]=0*1E15
+L.params[:Y_out]=0*1E15
 ##
-tri=mesh.triangles[1]
-X=mesh.points[:,tri]
-J=zeros(3,3)
-J[:,1:2]=X[:,1:end-1].-X[:,end]
-n=LinearAlgebra.cross(J[:,1],J[:,2])
-n./=LinearAlgebra.norm(n)
-J[:,3]=n
+sol,nn,flag=householder(L,370*2*pi,output=true,maxiter=10,tol=1E-10);
+perturb_fast!(sol,L,:v,30)
+f(v)=sol(:v,v,15,15)
+###
+L.params[:v]=A*3
+sol1,nn,flag=householder(L,370*2*pi,output=true,maxiter=10,tol=1E-10);

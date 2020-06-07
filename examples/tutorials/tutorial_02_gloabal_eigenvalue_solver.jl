@@ -1,6 +1,6 @@
-# #Tutorial 02
+# # Tutorial 02 Beyn's global eigenvalue solver
 #
-# ##Introduction
+# ## Introduction
 #
 # In Tutorial 01 you learnt the basics of the Helmholtz solver. This tutorial
 # will make you more familiar with the global eigenvalue solver. The solver
@@ -11,7 +11,7 @@
 # [2] P.E. Buschmann, G.A. Mensah, J.P. Moeck, Solution of Thermoacoustic Eigenvalue Problems with a Non-Iterative Method, J. Eng. Gas Turbines Power, Mar 2020, 142(3): 031022 (11 pages) https://doi.org/10.1115/1.4045076
 
 ## #jl
-# ##Model set up.
+# ## Model set up.
 # The model is the same Rijke tube configuration as in Tutorial 01:
 using WavesAndEigenvalues.Helmholtz
 mesh=Mesh("Rijke_mm.msh",scale=0.001) #load mesh
@@ -71,36 +71,36 @@ center_point=100
 # be well suited in a certain situation:
 # 1. Split your domain in several smaller domains. This reduces the potential
 # number of eigenvalues in each of the subdomains.
-# 2. Just repeatedly, rerun the solver with increasing values of `l` until
+# 2. Just repeatedly rerun the solver with increasing values of `l` until
 # the found eigenvalues do not change anymore.
 #
-# ##Qudrature points
+# ## Qudrature points
 #
 # As Beyn's algorithm is based on contour integration a numerical quadrature
 # method is performed under the hood. More precisely, the code performs a
 # Gauss-Legendre integration on each of the edges of the Polygon `Γ`. The number
-# of quadrature points for each of this integrations is `N=32` per default. But
+# of quadrature points for each of these integrations is `N=32` per default. But
 # you can specify it as an optional parameter when calling the solver.
-# For instance as the circular contour is already by by 1000 points. It is not
-# necessary to utilize `N=16` quadrature points on each of the edges. Let's say
-# `N=4` should be fine. Then you would call the solver like
+# For instance as the circular contour is already discretized by 1000 points, it
+# is not necessary to utilize `N=16` quadrature points on each of the edges.
+# Let's say `N=4` should be fine. Then, you would call the solver like
 Ω,P=beyn(L,Γ_circle,N=4,output=true)
 ## #src
-# ## test singular values
+# ## Test singular values
 #
 # One step in Beyn's algorithm requires a singular value decomposition. Non-zero
 # singular values and singular vectors associated with these are meant to be
-# disregarded. Unfornately, on a computer zero could also mean a very small
+# disregarded. Unfortunately, on a computer zero could also mean a very small
 # number, and *small* here is problem dependend. The code will disregard any
-# singular value `σ<tol` where `tol = 0.0` Per default. This means, that per
+# singular value `σ<tol` where `tol == 0.0` Per default. This means, that per
 # default only singular values that are exactly 0 will be disregraded. It is
 # very unlikely that this will be the case for any singular value. You may
-# specify you own threshold by the optional key-word argument `tol`
+# specify your own threshold by the optional key-word argument `tol`
 Ω,P=beyn(L,Γ, tol=1E-10)
 # but this is rather an option for experts. Even the authors of the code do not
 # know a systematic way of well defining this threshold for given configuration.
 ## #src
-# ##Test the position of the eigenvalues
+# ## Test the position of the eigenvalues
 #
 # Because there could be a lot of spurious eigenvalues as there is no correct
 # implementation of the singular value test. A very simple test to chek whether
@@ -109,11 +109,11 @@ center_point=100
 # keyword `pos_test`.
 Ω,P=beyn(L,Γ, pos_test=false)
 # Note, that if you disable the position test and do not specify a threshold for
-# the singular values you will allways be returned with `l` eigenvalues by
+# the singular values, you will always be returned with `l` eigenvalues by
 # Beyn's algorithm. (And sometimes even eigenvalues that are outside
 # of your contour are fairly correct... )
 ##   #src
-# ##Toggle the progressbar
+# ## Toggle the progress bar
 #
 # Especially when searching for many eigenvalues, in large domains the algorithm
 # may take some time to finish. You can, therefore, optionally display a
