@@ -1,18 +1,18 @@
-# #Tutorial 03
+# # Tutorial 03 Lancaster's local eigenvalue solver
 #
-# ##Introduction
+# ## Introduction
 # This tutorial will teach you the details of the local eigenvalue solver.
 # The solver is a generalization of Lancasters *Generalised Rayleigh Quotient
 # iteration* [1], in the sense that it enables not only Newton's method for root
 # finding, but also up to fith-order Householder iterations. The implementation
 # closely follows the consideration in [2].
 #
-#[1] P. Lancaster, A Generalised Rayleigh Quotient Iteration for Lambda-Matrices,Arch. Rational Mech Anal., 1961, 8, p.
-#309-322, https://doi.org/10.1007/BF00277446
+# [1] P. Lancaster, A Generalised Rayleigh Quotient Iteration for Lambda-Matrices,Arch. Rational Mech Anal., 1961, 8, p.
+# 309-322, https://doi.org/10.1007/BF00277446
 #
-#[2] G.A. Mensah, Efficient Computation of Thermoacoustic Modes, Ph.D. Thesis, TU Berlin, 2019
+# [2] G.A. Mensah, Efficient Computation of Thermoacoustic Modes, Ph.D. Thesis, TU Berlin, 2019
 ## #jl
-# ##Model set up.
+# ## Model set up.
 # The model is the same Rijke tube configuration as in Tutorial 01:
 using WavesAndEigenvalues.Helmholtz
 mesh=Mesh("Rijke_mm.msh",scale=0.001) #load mesh
@@ -23,8 +23,8 @@ dscrp["Outlet"]=(:admittance, (:Y,1E15)) #specify outlet BC
 ρ=1.225 #density at the reference location upstream to the flame in kg/m^3
 Tu=300.0    #K unburnt gas temperature
 Tb=1200.0    #K burnt gas temperature
-P0=101325.0 # ambient pressure in Pa
-A=pi*0.025^2 # cross sectional area of the tube
+P0=101325.0 #ambient pressure in Pa
+A=pi*0.025^2 #cross sectional area of the tube
 Q02U0=P0*(Tb/Tu-1)*A*γ/(γ-1) #the ratio of mean heat release to mean velocity Q02U0
 x_ref=[0.0; 0.0; -0.00101] #reference point
 n_ref=[0.0; 0.0; 1.00] #directional unit vector of reference velocity
@@ -35,7 +35,7 @@ R=287.05 # J/(kg*K) specific gas constant (air)
 speedofsound(x,y,z) = z<0. ? sqrt(γ*R*Tu) : sqrt(γ*R*Tb)
 c=generate_field(mesh,speedofsound)
 L=discretize(mesh,dscrp,c)
-
+## #jl
 # ## The local solver
 #
 # The key idea behind the local solver is simple: The eigenvalue problem
@@ -56,23 +56,23 @@ L=discretize(mesh,dscrp,c)
 # initial guess `z` for the eigenvalue `ω`` iteration.
 z=300.0*2*pi
 sol,nn,flag = householder(L, z)
-
+## #jl
 # ## Maximum iterations
 #
 # As per default five iteration are performed. This iteration number can be
 # customized using the keyword `maxiter` For instance the following command
 # runs 30 iterations
 sol,nn,flag = householder(L, z, maxiter=30)
-
-# Terminating a convergend solutions
+## #jl
+# Terminating converged solutions
 #
 # Usually, the procedure converges after a few iteration steps and further
 # iterations do not significantly improve the solution. For this reason the
-# keyword `tol` allows to set a threshold, such that two consecutive iterates
-# for the eigenvalue fullfill `abs(ω_0-ω_1)`, the iteration is terminated.
-# This keyword defaults to `tol=0.0` and, thus, `maxiter`iterations will be
-# performed. However, it is highly recommended to set the parameter to some
-# positive value whenever possible.
+# keyword `tol` allows for setting a threshold, such that two consecutive
+# iterates for the eigenvalue fulfill `abs(ω_0-ω_1)`, the iteration is
+# terminated. This keyword defaults to `tol=0.0` and, thus, `maxiter`iterations
+# will be performed. However, it is highly recommended to set the parameter to
+# some positive value whenever possible.
 sol,nn,flag = householder(L, z, maxiter=30, tol=1E-10)
 # Note that the toloerance is also a bound for the error associated with the
 # computed eigenvalue. Tip: The 64-bit floating numbers have an accuracy of
@@ -80,10 +80,10 @@ sol,nn,flag = householder(L, z, maxiter=30, tol=1E-10)
 # orders of magnitude smaller than the expected eigenvalue. Indeed, `tol=1E-10`
 # is already close to the machine-precision we can expect for the Rijke-tube
 # model.
+## #jl
+# ## Determining convergence
 #
-# ##Determining convergence
-#
-# Technically, the iteration may stop because of slow progress in the itreation
+# Technically, the iteration may stop because of slow progress in the iteration
 # rather than actual convergence. A simple indicator for actual convergnce is
 # the auxiliary eigenvalue `λ`. The closer it is to `0` the better is the
 # quality of the computed solution. To help the identification of falsely
@@ -92,14 +92,14 @@ sol,nn,flag = householder(L, z, maxiter=30, tol=1E-10)
 # feature only makes sense when a termination threshold has been specified.
 # As in the following example:
 sol,nn,flag = householder(L, z, maxiter=30, tol=1E-10, lam_tol=1E-8)
-# ##Faster convergence
+## #jl
+# ## Faster convergence
 # In order to improve the convergence rate, higher-order derivatives may be
 # computed. You can use up to fifth order perturbation theory to improve the
 # iteration via the `order` keyword. For instance, third-order theory is used
 # in this example
 sol,nn,flag = householder(L, z, maxiter=30, tol=1E-10, lam_tol=1E-8, order=3)
 #
-# ##
 #
 # Under the hood the routine calls ARPACK to utilize Arnoldi's method to solve
 # the linear (auxiliary) eigenvalue problem. This method can compute more than
