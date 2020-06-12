@@ -1,7 +1,7 @@
 include("make_FEM_header.jl")
 ## matrices
-function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,typ=:none)
-    f=F[order]
+function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,typ=:none,order_adj=-1)
+    fJ=F[order]
     if typeof(corder)==SymPy.Sym
         coeff=corder
     elseif corder==0
@@ -9,17 +9,23 @@ function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,ty
     else
         coeff=sum(C[corder])
     end
+    if order_adj==-1
+        fI=fJ
+    else
+        fI=F[order_adj]
+        symmetric=false
+    end
 
     if typ==:boundary
         f=f[surf[order]]
     end
 
     M=Array{Any}(undef,length(f),length(f))
-        for (i,fi) in enumerate(f)
+        for (i,fi) in enumerate(fI)
             if typ==:nabla
                     fi=grad(fi)
             end
-            for (j,fj) in enumerate(f)
+            for (j,fj) in enumerate(fJ)
                 if symmetric && j<i
                     continue
                 end
@@ -62,32 +68,32 @@ end
 
 ##
 function print_matrix(M,coeff=false,symmetric=false;diff="")
-    N=size(M,1)
+    N=size(M)
     if coeff
         txt=""
-        for i=1:N
-            for j=(symmetric ? i : 1) : N
+        for i=1:N[1]
+            for j=(symmetric ? i : 1) : N[2]
                 txt*="M$diff[$i,$j]="*string(M[i,j])*"\n"
             end
         end
         if symmetric
-            for i=1:N
-                for j=i+1:N
+            for i=1:N[1]
+                for j=i+1:N[2]
                     txt*="M$diff[$j,$i]=M$diff[$i,$j]\n"
                 end
             end
         end
     else
         txt="["
-        for i=1:N
-            for j=1:N
-                if j!=N
+        for i=1:N[1]
+            for j=1:N[2]
+                if j!=N[2]
                     txt*=string(M[i,j])*" "
                 else
                     txt*=string(M[i,j])
                 end
             end
-            if i!=N
+            if i!=N[1]
                 txt*=";\n"
             else
                 txt*="]"

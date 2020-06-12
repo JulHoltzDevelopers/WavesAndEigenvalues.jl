@@ -1,7 +1,7 @@
 include("make_FEM_header.jl")
 ## matrices
-function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,typ=:none)
-    f=F[order]
+function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,typ=:none,order_adj=-1)
+    fJ=F[order]
     if typeof(corder)==SymPy.Sym
         coeff=corder
     elseif corder==0
@@ -9,17 +9,25 @@ function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,ty
     else
         coeff=sum(C[corder])
     end
-
-    if typ==:boundary
-        f=f[surf[order]]
+    if order_adj==-1
+        fI=fJ
+        order_adj=order
+    else
+        fI=F[order_adj]
+        symmetric=false
     end
 
-    M=Array{Any}(undef,length(f),length(f))
-        for (i,fi) in enumerate(f)
+    if typ==:boundary
+        fI=fI[surf[order_adj]]
+        fJ=fJ[surf[order]]
+    end
+
+    M=Array{Any}(undef,length(fI),length(fJ))
+        for (i,fi) in enumerate(fI)
             if typ==:nabla
                     fi=grad(fi)
             end
-            for (j,fj) in enumerate(f)
+            for (j,fj) in enumerate(fJ)
                 if symmetric && j<i
                     continue
                 end
@@ -62,32 +70,32 @@ end
 
 ##
 function print_matrix(M,coeff=false,symmetric=false;diff="")
-    N=size(M,1)
+    N=size(M)
     if coeff
         txt=""
-        for i=1:N
-            for j=(symmetric ? i : 1) : N
+        for i=1:N[1]
+            for j=(symmetric ? i : 1) : N[2]
                 txt*="M$diff[$i,$j]="*string(M[i,j])*"\n"
             end
         end
         if symmetric
-            for i=1:N
-                for j=i+1:N
+            for i=1:N[1]
+                for j=i+1:N[2]
                     txt*="M$diff[$j,$i]=M$diff[$i,$j]\n"
                 end
             end
         end
     else
         txt="["
-        for i=1:N
-            for j=1:N
-                if j!=N
+        for i=1:N[1]
+            for j=1:N[2]
+                if j!=N[2]
                     txt*=string(M[i,j])*" "
                 else
                     txt*=string(M[i,j])
                 end
             end
-            if i!=N
+            if i!=N[1]
                 txt*=";\n"
             else
                 txt*="]"
@@ -133,37 +141,23 @@ end
 #M =local_matrix(1,0) mass matrix
 #M=local_matrix(1,0,0,3)
 #M=local_matrix(1,diff(sum(C[1]),z),0)
-for i=1:3
-    for j=1:3
-        if j<i
-            continue
-        end
-    M=local_matrix(3,(sum(b[2])*sum(C[2])).expand(),(i,j),typ=:diff,symmetric=false)
-    txt=print_matrix(M,true,false,diff="$i$j")
-        open("M$i$i.jl","w") do fid
-            write(fid,txt)
-        end
-    end
-end
-## simple test
-import ProgressMeter
-##
-intg=(sum(b[2])*sum(C[2])).expand()*SymPy.diff(fh01,x,x)*fh01
-intg=intg.expand()
-txt=string(intg)
-txt=replace(txt,"-"=>"+-")
-txt=split(txt," +")
-res=0
-p = ProgressMeter.Progress(length(txt),desc="Compute... ", dt=1,
-     barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),
-     barlen=10)
-for term in txt
-    global res
-    res+=tet_integrate(eval(Meta.parse(term)))
-    ProgressMeter.next!(p)
-end
-## vectors
+M=local_matrix(3,0,0,0,typ=:boundary)
 
+# for i=1:3
+#     for j=1:3
+#         if j<i
+#             continue
+#         end
+#     M=local_matrix(3,(sum(b[2])*sum(C[2])).expand(),(i,j),typ=:diff,symmetric=false)
+#     txt=print_matrix(M,true,false,diff="$i$j")
+#         open("M$i$i.jl","w") do fid
+#             write(fid,txt)
+#         end
+#     end
+# end
+txt=print_matrix(M,false,false,diff="")
+## vectors
+##
 function local_vector(order=1,corder=2, crdnt=0, crdnt_adj=0, typ=:none )
     f=F[order]
     if typeof(corder)==SymPy.Sym

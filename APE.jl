@@ -101,7 +101,7 @@ function aggregate_elements(mesh::Mesh, el_type=:1)
             end
             tetrahedra[idx]=copy(tet)
         end
-        dim=N_points*4+length(mesh.triangles)+length(inner_triangles)
+        dim=4*N_points+length(mesh.triangles)+length(inner_triangles)
     end
     return triangles, tetrahedra, dim
 end
@@ -166,16 +166,48 @@ end
 
 ##
 function discretize(mesh::Mesh,U)
-    L=LinearOperatorFamily(["ω","λ"],complex([0.,Inf]))
+    L=LinearOperatorFamily(["s","λ"],complex([0.,Inf]))
     N_points=size(mesh.points)[2]
-    dim=deepcopy(N_points)
+    N_lines=length(mesh.lines)
+    dim=N_points+3*(N_points+N_lines)
     P=101325
     ρ=1.225
     γ=1.4
     Y=0*1E15
+    triangles,tetrahedra=aggregate_elements(mesh,:2)
+
+    #interior (term I + III)
+    MM=ComplexF64[]
+    II=Int64[]
+    JJ=Int64[]
+    #for tet in mesh.tetrahedra
+    for tet in tetrahedra
+        J=CooTrafo(mesh.points[:,tet[1:4]])
+        #velocity components term I
+        mm=ρ*s43v2u2(J) #TODO: space-dependent ρ
+        ii, jj =create_indices(tet)
+        iip, jjp =create_indices(tet[1:4],tet[1:4])
+
+        #u
+        for dd=1:3
+            append!(MM,mm[:])
+            append!(II,ii[:].+N_points.+(dd-1)*(N_points+N_lines))
+            append!(JJ,jj[:].+N_points.+(dd-1)*(N_points+N_lines))
+        end
+
+        #pressure component Term III
+        mm=s43v1u1(J)
+        append!(MM,mm[:])
+        append!(II,iip[:])
+        append!(JJ,jjp[:])
+    end
+
+    M=SparseArrays.sparse(II,JJ,MM,dim,dim)
+    push!(L,Term(M,(pow1,),((:s,),),"s","M"))
+
+
 
     #Boundary matrix
-
     for dom in ("Inlet","Outlet")
         if dom=="Inlet"
             Ysym=:Y_in
@@ -193,10 +225,10 @@ function discretize(mesh::Mesh,U)
             ii, jj =create_indices(tri)
             mm=sqrt(γ*P/ρ)*s33v1u1(J)
             append!(MM,mm[:])
-            append!(II,ii[:].+3*dim)
-            append!(JJ,jj[:].+3*dim)
+            append!(II,ii[:])
+            append!(JJ,jj[:])
         end
-        M=SparseArrays.sparse(II,JJ,MM,4*dim,4*dim)
+        M=SparseArrays.sparse(II,JJ,MM,dim,dim)
         push!(L,Term(M,(pow1,),((Ysym,),),string(Ysym),"B"))
     end
 
@@ -206,83 +238,59 @@ function discretize(mesh::Mesh,U)
     MM=ComplexF64[]
     II=Int64[]
     JJ=Int64[]
-    for tet in mesh.tetrahedra
-        J=CooTrafo(mesh.points[:,tet])
-        ii, jj =create_indices(tet)
-
-
-
+    for tet in tetrahedra
+        J=CooTrafo(mesh.points[:,tet[1:4]])
+        ii, jj = create_indices(tet[1:end],tet[1:4])
+        iip,jjp= create_indices(tet[1:4],tet[1:end])
         for dd=1:3
             #TERM II
             #u†p
-            mm=s43v1du1(J,dd)
+            mm=s43v2du1(J,dd)
             append!(MM,mm[:])
-            append!(II,ii[:].+(dd-1)*dim)
-            append!(JJ,jj[:].+3*dim)
+            append!(II,ii[:].+N_points.+(dd-1)*(N_points+N_lines))
+            append!(JJ,jj[:])
 
             #termIV
-            mm=-γ*P*s43dv1u1(J,dd) #TODO: space-dependent P
+            mm=-γ*P*s43dv1u2(J,dd) #TODO: space-dependent P
             append!(MM,mm[:])
-            append!(II,ii[:].+3*dim)
-            append!(JJ,jj[:].+(dd-1)*dim)
+            append!(II,iip[:])
+            append!(JJ,jjp[:].+N_points.+(dd-1)*(N_points+N_lines))
         end
     end
-    M=SparseArrays.sparse(II,JJ,MM,4*dim,4*dim)
+    M=SparseArrays.sparse(II,JJ,MM,dim,dim)
     push!(L,Term(M,(),(),"","K"))
 
-    #interior (term I + III)
-    MM=ComplexF64[]
-    II=Int64[]
-    JJ=Int64[]
-    #for tet in mesh.tetrahedra
-    for tet in mesh.tetrahedra
-        J=CooTrafo(mesh.points[:,tet])
-        #velocity components term I
-        mm=ρ*s43v1u1(J) #TODO: space-dependent ρ
-        ii, jj =create_indices(tet)
 
-        #u
-        for dd=1:3
-            append!(MM,mm[:])
-            append!(II,ii[:].+(dd-1)*dim)
-            append!(JJ,jj[:].+(dd-1)*dim)
-        end
-
-        #pressure component Term III
-        mm=s43v1u1(J)
-        append!(MM,mm[:])
-        append!(II,ii[:].+3*dim)
-        append!(JJ,jj[:].+3*dim)
-    end
-
-    M=SparseArrays.sparse(II,JJ,MM,4*dim,4*dim)
-    push!(L,Term(1.0im*M,(pow1,),((:ω,),),"iω","M"))
 
 
     #term V and VI (mean flow)
     MM=ComplexF64[]
     II=Int64[]
     JJ=Int64[]
-    for tet in mesh.tetrahedra
-        J=CooTrafo(mesh.points[:,tet])
+    for tet in tetrahedra
+        J=CooTrafo(mesh.points[:,tet[1:4]])
         ii, jj =create_indices(tet)
+        iip, jjp =create_indices(tet[1:4])
         #term V
         for dd=1:3
-            u=U[dd,tet]
-            mtx=s43v1du1c1(J,u,dd)
-            mm=ρ*(s43diffc1(J,u,dd)*s43v1u1(J)+mtx)
+            for ee=1:3
+                u=U[ee,tet[1:4]]
+                #mtx= #TODO: speed up by correct ordering
+                mm=ρ*(s43diffc1(J,u,dd)*s43v2u2(J)+s43v2du2c1(J,u,dd))
+                append!(MM,mm[:])
+                append!(II,ii[:].+N_points.+(dd-1)*(N_points+N_lines))
+                append!(JJ,jj[:].+N_points.+(ee-1)*(N_points+N_lines))
+            end
+            #term VI
+            u=U[dd,tet[1:4]]
+            mm=s43v1du1c1(J,u,dd)
             append!(MM,mm[:])
-            append!(II,ii[:].+(dd-1)*dim)
-            append!(JJ,jj[:].+(dd-1)*dim)
-
-            #term IV
-            append!(MM,mtx[:])
-            append!(II,ii[:].+3*dim)
-            append!(JJ,jj[:].+3*dim)
+            append!(II,iip[:])
+            append!(JJ,jjp[:])
         end
     end
     L.params[:v]=0.0
-    M=SparseArrays.sparse(II,JJ,MM,4*dim,4*dim)
+    M=SparseArrays.sparse(II,JJ,MM,dim,dim)
     push!(L,Term(M,(pow1,),((:v,),),"v","U"))
 
 
@@ -291,30 +299,25 @@ function discretize(mesh::Mesh,U)
     MM=ComplexF64[]
     II=Int64[]
     JJ=Int64[]
-    for tet in mesh.tetrahedra
-        J=CooTrafo(mesh.points[:,tet])
-        mm=s43v1u1(J)
+    for tet in tetrahedra
+        J=CooTrafo(mesh.points[:,tet[1:4]])
+        mm=ρ*s43v2u2(J)
         ii, jj =create_indices(tet)
+        iip, jjp =create_indices(tet[1:4])
 
-        #u
+        for dd=1:3
+            #u
+            append!(MM,mm[:])
+            append!(II,ii[:].+N_points.+(dd-1)*(N_points+N_lines))
+            append!(JJ,jj[:].+N_points.+(dd-1)*(N_points+N_lines))
+        end
+        #pressure component Term III
+        mm=s43v1u1(J)
         append!(MM,mm[:])
-        append!(II,ii[:].+0*dim)
-        append!(JJ,jj[:].+0*dim)
-        #v
-        append!(MM,mm[:])
-        append!(II,ii[:].+1*dim)
-        append!(JJ,jj[:].+1*dim)
-        #w
-        append!(MM,mm[:])
-        append!(II,ii[:].+2*dim)
-        append!(JJ,jj[:].+2*dim)
-
-        #pressure component Te÷rm III
-        append!(MM,mm[:])
-        append!(II,ii[:].+3*dim)
-        append!(JJ,jj[:].+3*dim)
+        append!(II,iip[:])
+        append!(JJ,jjp[:])
     end
-    M=SparseArrays.sparse(II,JJ,MM,4*dim,4*dim)
+    M=SparseArrays.sparse(II,JJ,MM,dim,dim)
     push!(L,Term(-M,(pow1,),((:λ,),),"-λ","__aux__"))
     return L#II,JJ,MM,M
 end
@@ -333,9 +336,9 @@ phi=L\v
 ##
 N_points=size(mesh.points,2)
 u=Array{Float64}(undef,3,N_points)
-#u[1,:]=zeros(N_points)#phi[0*N_points+1:1*N_points]
-#u[2,:]=zeros(N_points)#phi[1*N_points+1:2*N_points]
-#u[3,:]=ones(N_points)#phi[2*N_points+1:3*N_points]
+# u[1,:]=zeros(N_points)#phi[0*N_points+1:1*N_points]
+# u[2,:]=zeros(N_points)#phi[1*N_points+1:2*N_points]
+# u[3,:]=ones(N_points)#phi[2*N_points+1:3*N_points]
 u[1,:]=phi[1*N_points+1:2*N_points]
 u[2,:]=phi[2*N_points+1:3*N_points]
 u[3,:]=phi[3*N_points+1:4*N_points]
@@ -346,10 +349,59 @@ L=discretize(mesh,u)
 ##
 L.params[:Y_in]=0*1E15
 L.params[:Y_out]=0*1E15
+L.params[:v]=10
 ##
-sol,nn,flag=householder(L,370*2*pi,output=true,maxiter=10,tol=1E-10);
+import Arpack
+##
+Y_in=0
+Y_out=0
+V=-.01
+M=L.terms[1].coeff
+A=Y_in*L.terms[2].coeff+Y_out*L.terms[3].coeff+L.terms[4].coeff+V*L.terms[5].coeff
+
+
+SOL=Arpack.eigs(A,M,nev=5, sigma = 340im*2*pi,)
+
+##
+Γ=[335.0+5.0im, 335.0-5.0im, 345.0-5.0im, 345.0+5.0im].*2*pi*1im #corner points for the contour (in this case a rectangle)
+Ω, P = beyn(L,Γ,l=5,N=16, output=true)
+##
+L.params[:v]=1
+sol,nn,flag=householder(L,( 342.4168944643069im - 0.23084620589322044)*2*pi,output=true,maxiter=10,tol=1E-10);
+##
+N_points=size(mesh.points,2)
+N_lines=length(mesh.lines)
+data=Dict()
+dim=size(mesh.points,2)
+max_uvw=maximum(abs.(sol.v[N_points+1:end]))
+p=sol.v[N_points.+(0)*(N_points+N_lines)+1:N_points.+(1)*(N_points+N_lines)]
+data["abs u"]=abs.(p)/max_uvw
+data["phase u"]=angle.(p)
+data["real u"]=real.(p)
+data["imag u"]=imag.(p)
+p=sol.v[N_points.+(1)*(N_points+N_lines)+1:N_points.+(2)*(N_points+N_lines)]
+data["abs v"]=abs.(p)/max_uvw
+data["phase v"]=angle.(p)
+data["real v"]=real.(p)
+data["imag v"]=imag.(p)
+p=sol.v[N_points.+(2)*(N_points+N_lines)+1:N_points.+(3)*(N_points+N_lines)]
+data["abs w"]=abs.(p)/max_uvw
+data["phase w"]=angle.(p)
+data["real w"]=real.(p)
+data["imag w"]=imag.(p)
+p=sol.v[1:N_points]
+data["abs p"]=abs.(p)/maximum(abs.(p))
+data["phase p"]=angle.(p)
+data["real p"]=real.(p)
+data["imag p"]=imag.(p)
+data["U"]=u[1,:]
+data["V"]=u[2,:]
+data["W"]=u[3,:]
+vtk_write("flow",mesh,data)
+##
 perturb_fast!(sol,L,:v,30)
 f(v)=sol(:v,v,15,15)
+
 ###
 L.params[:v]=A*3
 sol1,nn,flag=householder(L,370*2*pi,output=true,maxiter=10,tol=1E-10);
