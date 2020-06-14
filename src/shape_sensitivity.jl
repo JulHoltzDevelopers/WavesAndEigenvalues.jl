@@ -35,6 +35,8 @@ function discrete_adjoint_shape_sensitivity(mesh::Mesh,dscrp,C,surface_points,tr
         #global D, D_left, D_right, domains
         pnt_idx=surface_points[idx]
         domains=Dict()
+        #shorten domain simplex-list s.t. only simplices that are connected to current
+        #surface point occur.
         for dom in keys(dscrp)
             domain=deepcopy(mesh.domains[dom])
             dim=domain["dimension"]
@@ -55,8 +57,12 @@ function discrete_adjoint_shape_sensitivity(mesh::Mesh,dscrp,C,surface_points,tr
             domain["simplices"]=simplices
             domains[dom]=domain
         end
+        #construct mesh with reduced domains
         mesh_h=Mesh("mesh_h",deepcopy(mesh.points),mesh.lines,mesh.triangles,mesh.tetrahedra,domains,"constructed from mesh", mesh.tri2tet,[])
+        #get cooridnates of current surface point
         pnt=mesh_h.points[:,pnt_idx]
+        #perturb coordinates for all three directions and compute operator derivative by central FD
+        #then use operator derivative to compute eigval sensitivity by adjoint approach
         for crdnt=1:3
             mesh_h.points[:,pnt_idx]=pnt
             mesh_h.points[crdnt,pnt_idx]+=h
@@ -81,9 +87,10 @@ end
 Normalize shape sensitivity with directed area of adjacent triangles.
 """
 function normalize_sensitivity(surface_points,normal_vectors,tri_mask,sens)
+    #preallocate arrays
     A=Array{Float64}(undef,length(normal_vectors))#
     V=Array{Float64}(undef,length(normal_vectors))
-            normed_sens=zeros(ComplexF64,size(normal_vectors))
+    normed_sens=zeros(ComplexF64,size(normal_vectors))
     for (crdnt,v) in enumerate(([1.0; 0.0; 0.0],[0.0; 1.0; 0.0],[0.0; 0.0; 1.0]))
         #compute triangle area and volume flow
         for idx =1:size(normal_vectors,2)
@@ -96,7 +103,7 @@ function normalize_sensitivity(surface_points,normal_vectors,tri_mask,sens)
             pnt=surface_points[idx]
             tris=tri_mask[idx]
             vol=sum(abs.(V[tris]))#common volume flow of all adjacent triangles
-            if vol==0 #TODO: compare against some refernce value
+            if vol==0 #TODO: compare against some reference value to check for numerical zero
                 #println("$idx")
                 continue
             end

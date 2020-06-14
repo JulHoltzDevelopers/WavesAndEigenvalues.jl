@@ -479,17 +479,167 @@ function link_triangles_to_tetrahedra!(mesh::Mesh)
     end
     return nothing
 end
-# function link_triangles_to_tetrahedra!(mesh::Mesh)
-#     for (idx,tri) in enumerate(mesh.triangles)
-#         for (idt::UInt32,tet) in enumerate(mesh.tetrahedra)
-#             if all([i in tet for i=tri])
-#                 mesh.tri2tet[idx]=idt
-#                 break
-#             end
-#         end
-#     end
-#     return
-# end
+
+##
+"""
+    new_mesh=octosplit(mesh::Mesh)
+
+Subdivide each tetrahedron in the mesh `mesh` into 8 tetrahedra by splitting
+each edge at its center.
+
+# Notes
+The algorithm introduces `length(mesh.lines)` new vertices. This yields a finer
+mesh featuring `8*size(mesh,2)` tetrahedra, `4*length(mesh.triangles)`
+triangles, and `2*length(mesh.lines)` lines. From the  3 possible subdivision of
+a tetrahedron the algorithm automatically chooses the one that minimizes the
+edge lengths of the new tetrahedra. The point labeling of `new_mesh` is
+consistent with the point labeling in `mesh`, i.e., the first
+`size(mesh.points,2)` points in `new_mesh.points` are identical to the points
+in `mesh.points`. Hence, `mesh` and `new_mesh` form a hierachy of meshes.
+"""
+function octosplit(mesh::Mesh)
+    collect_lines!(mesh)
+    N_points=size(mesh.points,2)
+    N_lines=length(mesh.lines)
+    N_tet=length(mesh.tetrahedra)
+    N_tri=length(mesh.triangles)
+    ##
+    points=Array{Float64,2}(undef,3,N_points+N_lines)
+    ## extend point list
+    points[:,1:N_points]=mesh.points
+    for (idx,ln) in enumerate(mesh.lines)
+        points[:,N_points+idx]= sum(mesh.points[:,ln],dims=2)./2
+    end
+    #create new tetrahedra by splitting the oldones
+    tetrahedra=Array{UInt32}[]
+    for tet in mesh.tetrahedra
+        A,B,C,D=tet #old vertices
+        #indices of the center points of the lines also become vertices
+        AB=N_points+find_smplx(mesh.lines,[A,B])
+        AC=N_points+find_smplx(mesh.lines,[A,C])
+        AD=N_points+find_smplx(mesh.lines,[A,D])
+        BC=N_points+find_smplx(mesh.lines,[B,C])
+        BD=N_points+find_smplx(mesh.lines,[B,D])
+        CD=N_points+find_smplx(mesh.lines,[C,D])
+
+        #outer tetrahedra always present...
+        insert_smplx!(tetrahedra,[A, AB, AC, AD])
+        insert_smplx!(tetrahedra,[B, AB, BC, BD])
+        insert_smplx!(tetrahedra,[C, AC, BC, CD])
+        insert_smplx!(tetrahedra,[D, AD, BD, CD])
+
+        # split remaining octet based on minimum distance
+        AB_CD=LinearAlgebra.norm(points[:,AB].-points[:,CD])
+        AC_BD=LinearAlgebra.norm(points[:,AC].-points[:,BD])
+        AD_BC=LinearAlgebra.norm(points[:,AD].-points[:,BC])
+
+        if AB_CD<=AC_BD && AB_CD<=AD_BC
+            insert_smplx!(tetrahedra,[AB,CD,AC,AD])
+            insert_smplx!(tetrahedra,[AB,CD,AD,BD])
+            insert_smplx!(tetrahedra,[AB,CD,BD,BC])
+            insert_smplx!(tetrahedra,[AB,CD,BC,AC])
+        elseif AC_BD<=AB_CD && AC_BD<=AD_BC
+            insert_smplx!(tetrahedra,[AC,BD,AB,AD])
+            insert_smplx!(tetrahedra,[AC,BD,AD,CD])
+            insert_smplx!(tetrahedra,[AC,BD,CD,BC])
+            insert_smplx!(tetrahedra,[AC,BD,BC,AB])
+        elseif AD_BC<=AC_BD && AD_BC<=AB_CD
+            insert_smplx!(tetrahedra,[AD,BC,AC,CD])
+            insert_smplx!(tetrahedra,[AD,BC,CD,BD])
+            insert_smplx!(tetrahedra,[AD,BC,BD,AB])
+            insert_smplx!(tetrahedra,[AD,BC,AB,AC])
+        end
+    end
+
+    #split the old surface triangles
+    triangles=Array{UInt32}[]
+    for tri in mesh.triangles
+        A,B,C=tri
+        AB=N_points+find_smplx(mesh.lines,[A,B])
+        AC=N_points+find_smplx(mesh.lines,[A,C])
+        BC=N_points+find_smplx(mesh.lines,[B,C])
+        insert_smplx!(triangles,[A,AB,AC])
+        insert_smplx!(triangles,[B,AB,BC])
+        insert_smplx!(triangles,[C,AC,BC])
+        insert_smplx!(triangles,[AB,AC,BC])
+    end
+
+    ## relabel tetrahedra
+    tet_labels=Array{UInt32}(undef,N_tet,8)
+    for (idx,tet) in enumerate(mesh.tetrahedra)
+        A,B,C,D=tet #old vertices
+        #indices of the center points of the lines also become vertices
+        AB=N_points+find_smplx(mesh.lines,[A,B])
+        AC=N_points+find_smplx(mesh.lines,[A,C])
+        AD=N_points+find_smplx(mesh.lines,[A,D])
+        BC=N_points+find_smplx(mesh.lines,[B,C])
+        BD=N_points+find_smplx(mesh.lines,[B,D])
+        CD=N_points+find_smplx(mesh.lines,[C,D])
+
+        #outer tetrahedra always present...
+        tet_labels[idx,1]=find_smplx(tetrahedra,[A, AB, AC, AD])
+        tet_labels[idx,2]=find_smplx(tetrahedra,[B, AB, BC, BD])
+        tet_labels[idx,3]=find_smplx(tetrahedra,[C, AC, BC, CD])
+        tet_labels[idx,4]=find_smplx(tetrahedra,[D, AD, BD, CD])
+
+        # split remaining octet based on minimum distance
+        AB_CD=LinearAlgebra.norm(points[:,AB].-points[:,CD])
+        AC_BD=LinearAlgebra.norm(points[:,AC].-points[:,BD])
+        AD_BC=LinearAlgebra.norm(points[:,AD].-points[:,BC])
+
+        if AB_CD<=AC_BD && AB_CD<=AD_BC
+            tet_labels[idx,5]=find_smplx(tetrahedra,[AB,CD,AC,AD])
+            tet_labels[idx,6]=find_smplx(tetrahedra,[AB,CD,AD,BD])
+            tet_labels[idx,7]=find_smplx(tetrahedra,[AB,CD,BD,BC])
+            tet_labels[idx,8]=find_smplx(tetrahedra,[AB,CD,BC,AC])
+        elseif AC_BD<=AB_CD && AC_BD<=AD_BC
+            tet_labels[idx,5]=find_smplx(tetrahedra,[AC,BD,AB,AD])
+            tet_labels[idx,6]=find_smplx(tetrahedra,[AC,BD,AD,CD])
+            tet_labels[idx,7]=find_smplx(tetrahedra,[AC,BD,CD,BC])
+            tet_labels[idx,8]=find_smplx(tetrahedra,[AC,BD,BC,AB])
+        elseif AD_BC<=AC_BD && AD_BC<=AB_CD
+            tet_labels[idx,5]=find_smplx(tetrahedra,[AD,BC,AC,CD])
+            tet_labels[idx,6]=find_smplx(tetrahedra,[AD,BC,CD,BD])
+            tet_labels[idx,7]=find_smplx(tetrahedra,[AD,BC,BD,AB])
+            tet_labels[idx,8]=find_smplx(tetrahedra,[AD,BC,AB,AC])
+        end
+    end
+
+    #relabel triangles
+    tri_labels=Array{UInt32}(undef,N_tri,4)
+    for (idx,tri) in enumerate(mesh.triangles)
+        A,B,C=tri
+        AB=N_points+find_smplx(mesh.lines,[A,B])
+        AC=N_points+find_smplx(mesh.lines,[A,C])
+        BC=N_points+find_smplx(mesh.lines,[B,C])
+        tri_labels[idx,1]=find_smplx(triangles,[A,AB,AC])
+        tri_labels[idx,2]=find_smplx(triangles,[B,AB,BC])
+        tri_labels[idx,3]=find_smplx(triangles,[C,AC,BC])
+        tri_labels[idx,4]=find_smplx(triangles,[AB,AC,BC])
+    end
+
+    #reassemble domains
+    domains=Dict()
+    for (dom,domain) in mesh.domains
+        domains[dom]=Dict()
+        dim=domain["dimension"]
+        domains[dom]["dimension"]=dim
+        #TODO: detect whether there optional field like "size"
+        simplices=[]
+        for smplx_idx in domain["simplices"]
+            if dim==3
+                append!(simplices,tet_labels[smplx_idx,:])
+            elseif dim==2
+                append!(simplices,tri_labels[smplx_idx,:])
+            end
+        end
+        domains[dom]["simplices"]=sort(simplices)
+    end
+
+    tri2tet=zeros(UInt32,length(triangles))
+    tri2tet[1]=0xffffffff #magic sentinel value to check whether list is linked
+    return Mesh(mesh.file, points, [], triangles, tetrahedra, domains, mesh.file,tri2tet,1)
+end
 
 
 ##

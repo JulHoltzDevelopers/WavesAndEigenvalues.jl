@@ -5,10 +5,10 @@
 Compute equation for a plane from the three points defined in A. The plane is parameterized
 as `a*x+b*y+c*z+d==0` with the coefficients returned as `pln=[a,b,c,d]`.
 
-#Arguments
+# Arguments
 - A::3×3-Array : Array containing the three points defining the plane as columns.
 
-#Notes
+# Notes
 Code adapted from https://www.geeksforgeeks.org/program-to-find-equation-of-a-plane-passing-through-3-points/
 """
 function three_points_to_plane(A)
@@ -40,7 +40,7 @@ end
 
 Reflect point `pnt` at plane `pln` and return as `p`.
 
-#Notes
+# Notes
 Code adapted from https://www.geeksforgeeks.org/mirror-of-a-point-through-a-3-d-plane/
 """
 function reflect_point_at_plane(pnt,pln)
@@ -55,7 +55,7 @@ end
 
 Compute the position of the foot of the perpendicular from the point `pnt` to the plane `pln`.
 
-#Notes
+# Notes
 Code adapted from https://www.geeksforgeeks.org/mirror-of-a-point-through-a-3-d-plane/
 """
 function find_foot_of_perpendicular(pnt,pln)
@@ -84,7 +84,7 @@ end
 Find a parametrization of the axis defined by the intersection of the planes `pln1`and `pln2`.
 The axis is parameterized by a point `p` and direction `n`.
 
-#Notes
+# Notes
 The algorithm follows John Krumm's solution for finding a common point on two intersecting planes as it is
 explained in https://math.stackexchange.com/questions/475953/how-to-calculate-the-intersection-of-two-planes
 To simplify the code, here the point p0 is the origin.
