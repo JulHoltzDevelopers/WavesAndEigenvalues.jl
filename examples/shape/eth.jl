@@ -1,6 +1,9 @@
 using WavesAndEigenvalues.Helmholtz
 import WavesAndEigenvalues.Meshutils: insert_smplx!, find_smplx,sort_smplx
 import Interpolations
+
+include("read_vtu_wild.jl")
+#mesh=octosplit(mesh)
 ##
 #mesh=Mesh("ethv4.msh",scale=.001)
 #collect_lines!(mesh)
@@ -71,17 +74,7 @@ L=discretize(mesh, dscrp, C, el_type=1, c_type=0)
 #param=:τ
 ##
 sol,n,flag=householder(L,(150)*2*pi,maxiter=30,order=5,tol=1E-10,n_eig_val=1,output=true);
-##
 
-mode="[$(string(round((sol.params[:ω]/2/pi),digits=2)))]Hz"
-
-data=Dict()
-data["abs_p"*mode]=abs.(sol.v)./maximum(abs.(sol.v))
-data["phase_p"*mode]=angle.(sol.v)
-data["abs_p_adj"*mode]=abs.(sol.v_adj)./maximum(abs.(sol.v_adj))
-data["phase_p_adj"*mode]=angle.(sol.v_adj)
-data["speed_of_sound"]=C
-vtk_write("eth",mesh,data)
 ## shape_sensitivity
 surface_points, tri_mask, tet_mask =get_surface_points(mesh)
 normal_vectors=get_normal_vectors(mesh)
@@ -97,24 +90,53 @@ DD["normal_sens"]=real.(normal_sens)
 vtk_write_tri("eth_tri",mesh,DD)
 
 ##
-#(type Γ by typing \Gamma and Enter)
-Γ=[20.0+5.0im, 20.0-5.0im, 400.0-5.0im, 400.0+5.0im].*2*pi #corner points for the contour (in this case a rectangle)
-Ω, P = beyn(L,Γ,l=10,N=64, output=true)
-##verify beyn's solution by local householder iterationtol=1E-10
-D=Dict()
-tol=1E-10
-for idx=1:length(Ω)
-    sol,nn,flag=householder(L,Ω[idx],maxiter=6,order=5,tol=tol,n_eig_val=3,output=false);
-    mode="[$(string(round((Ω[idx]/2/pi),digits=2)))]Hz"
-    if abs(sol.params[:ω]-Ω[idx])<1
-        println("Kept:$mode")
-        D["abs:"*mode]=abs.(sol.v)./maximum(abs.(sol.v)) #note that in Julia any function can be performed elementwise by putting a . before the paranthesis
-        D["phase:"*mode]=angle.(sol.v)
-    else
-        convmode="[$(string(round((sol.params[:ω]/2/pi),digits=2)))]Hz"
-        println("Excluded:$mode because converged to $convmode")
-    end
-end
+
+mode="[$(string(round((sol.params[:ω]/2/pi),digits=2)))]Hz"
+
+data=Dict()
+data["abs_p"*mode]=abs.(sol.v)./maximum(abs.(sol.v))
+data["phase_p"*mode]=angle.(sol.v)
+data["abs_p_adj"*mode]=abs.(sol.v_adj)./maximum(abs.(sol.v_adj))
+data["phase_p_adj"*mode]=angle.(sol.v_adj)
+data["speed_of_sound"]=C
+data["discrete adjoint x"*mode]=real.(sens[1,:])
+data["discrete adjoint y"*mode]=real.(sens[2,:])
+data["discrete adjoint z"*mode]=real.(sens[3,:])
+vtk_write("eth",mesh,data)
 ##
-D["speedofsound"]=C
-vtk_write("ETH",mesh,D)
+## FD approach
+fd_sens=forward_finite_differences_shape_sensitivity(mesh,dscrp,C,surface_points,tri_mask,tet_mask,L,sol)
+## write output
+mode="[$(string(round((sol.params[:ω]/2/pi),digits=2)))]Hz"
+data=Dict()
+data["abs_p"*mode]=abs.(sol.v)./maximum(abs.(sol.v))
+data["phase_p"*mode]=angle.(sol.v)
+data["abs_p_adj"*mode]=abs.(sol.v_adj)./maximum(abs.(sol.v_adj))
+data["phase_p_adj"*mode]=angle.(sol.v_adj)
+data["discrete adjoint x"*mode]=real.(fd_sens[1,:])
+data["discrete adjoint y"*mode]=real.(fd_sens[2,:])
+data["discrete adjoint z"*mode]=real.(fd_sens[3,:])
+vtk_write("eth_fd", mesh, data)
+
+##
+#(type Γ by typing \Gamma and Enter)
+# Γ=[20.0+5.0im, 20.0-5.0im, 400.0-5.0im, 400.0+5.0im].*2*pi #corner points for the contour (in this case a rectangle)
+# Ω, P = beyn(L,Γ,l=10,N=64, output=true)
+# ##verify beyn's solution by local householder iterationtol=1E-10
+# D=Dict()
+# tol=1E-10
+# for idx=1:length(Ω)
+#     sol,nn,flag=householder(L,Ω[idx],maxiter=6,order=5,tol=tol,n_eig_val=3,output=false);
+#     mode="[$(string(round((Ω[idx]/2/pi),digits=2)))]Hz"
+#     if abs(sol.params[:ω]-Ω[idx])<1
+#         println("Kept:$mode")
+#         D["abs:"*mode]=abs.(sol.v)./maximum(abs.(sol.v)) #note that in Julia any function can be performed elementwise by putting a . before the paranthesis
+#         D["phase:"*mode]=angle.(sol.v)
+#     else
+#         convmode="[$(string(round((sol.params[:ω]/2/pi),digits=2)))]Hz"
+#         println("Excluded:$mode because converged to $convmode")
+#     end
+# end
+# ##
+# D["speedofsound"]=C
+# vtk_write("ETH",mesh,D)

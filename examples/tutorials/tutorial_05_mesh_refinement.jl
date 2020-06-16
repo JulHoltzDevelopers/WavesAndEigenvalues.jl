@@ -1,6 +1,6 @@
 ## standard example
 using WavesAndEigenvalues.Helmholtz
-mesh=Mesh("./examples/tutorials/Rijke_mm.msh",scale=0.001)
+mesh=Mesh("Rijke_mm.msh",scale=0.001)
 dscrp=Dict() #initialize model discreptor
 dscrp["Interior"]=(:interior, ()) #define resonant cavity
 dscrp["Outlet"]=(:admittance, (:Y,1E15)) #specify outlet BC
@@ -37,7 +37,7 @@ data=Dict()
 data["speed_of_sound"]=c
 data["abs"]=abs.(sol.v)/maximum(abs.(sol.v)) #normalize so that max=1
 data["phase"]=angle.(sol.v)
-vtk_write("otest", fine_mesh, data) # Write the solution to paraview
+vtk_write("fine_test", fine_mesh, data) # Write the solution to paraview
 
 ## If you think that's not enough, well, then try...
 fine_mesh=octosplit(fine_mesh)

@@ -1,7 +1,9 @@
 #Simple tube example.
 using WavesAndEigenvalues.Helmholtz
+#import ProgressMeter
 ##
 mesh=Mesh("Rijke_mm.msh",scale=0.001)
+mesh=octosplit(mesh)
 C=ones(length(mesh.tetrahedra))*347.0
 dscrp=Dict()
 dscrp["Interior"]=(:interior,())
@@ -16,19 +18,15 @@ sol, n, flag = householder(L,3*147*2*pi,maxiter=14, tol=1E-10,output = true, n_e
 
 
 ##
+# identify surface points
 surface_points, tri_mask, tet_mask =get_surface_points(mesh)
+# compute normal vectors on surface triangles
 normal_vectors=get_normal_vectors(mesh)
-
 ## DA approach
-
-
-##
 sens=discrete_adjoint_shape_sensitivity(mesh,dscrp,C,surface_points,tri_mask,tet_mask,L,sol)
-
-
-##
+# normalize point sensitivity with directed surface triangle area
 normed_sens=normalize_sensitivity(surface_points,normal_vectors,tri_mask,sens)
-##
+# compute sensitivity in unit normal direction
 normal_sens = normal_sensitivity(normal_vectors, normed_sens)
 
 
@@ -39,7 +37,7 @@ DD["normed_sens1"]=real.(normed_sens[1,:])
 DD["normed_sens2"]=real.(normed_sens[2,:])
 DD["normed_sens3"]=real.(normed_sens[3,:])
 DD["normal_sens"]=real.(normal_sens)
-vtk_write_tri("tri",mesh,DD)
+vtk_write_tri("tri_fine",mesh,DD)
 
 
 ##
@@ -55,55 +53,72 @@ data["discrete adjoint z"*mode]=real.(sens[3,:])
 #data["finite difference"*mode]=real.(sens_FD)
 #data["central finite difference"]=real.(sens_CFD)
 #data["diff DA -- FD"*mode]=abs.((sens.-sens_FD))
-vtk_write("shape_sense_v1", mesh, data)
+vtk_write("shape_sense_v1_fine", mesh, data)
 ## FD approach
-sens_FD=zeros(ComplexF64,size(mesh.points,2))
-p = ProgressMeter.Progress(length(surface_points),desc="FD Sensitivity... ", dt=1,
-     barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),
-     barlen=20)
-for idx=1:length(surface_points)
-    #global G
-    pnt_idx=surface_points[idx]
-    crdnt=3
-    #forward finite difference
-    mesh_h=Mesh("mesh_h",deepcopy(mesh.points),mesh.lines,mesh.triangles,mesh.tetrahedra,mesh.domains,"constructed from mesh", mesh.tri2tet,[])
-    mesh_h.points[crdnt,pnt_idx]+=h
-    G=discretize(mesh_h, dscrp, C)
-    sol, n, flag = householder(G,ω0,maxiter=4, output = false, n_eig_val=3)
-    sens_FD[pnt_idx]=(sol.params[:ω]-ω0)/(h)
-
-    #update progressMeter
-    ProgressMeter.next!(p)
-end
-
-##
-mode="[$(string(round((ω0/2/pi),digits=2)))]Hz"
-
+fd_sens=forward_finite_differences_shape_sensitivity(mesh,dscrp,C,surface_points,tri_mask,tet_mask,L,sol)
+## write output
+mode="[$(string(round((sol.params[:ω]/2/pi),digits=2)))]Hz"
 data=Dict()
-data["abs_p"*mode]=abs.(sol.v0)./maximum(abs.(sol.v0))
-data["phase_p"*mode]=angle.(sol.v0)
-data["abs_p_adj"*mode]=abs.(sol.v0Adj)./maximum(abs.(sol.v0Adj))
-data["phase_p_adj"*mode]=angle.(sol.v0Adj)
-data["discrete adjoint x"*mode]=real.(sens1)
-data["discrete adjoint y"*mode]=real.(sens2)
-data["discrete adjoint z"*mode]=real.(sens3)
-#data["finite difference"*mode]=real.(sens_FD)
+data["abs_p"*mode]=abs.(sol.v)./maximum(abs.(sol.v))
+data["phase_p"*mode]=angle.(sol.v)
+data["abs_p_adj"*mode]=abs.(sol.v_adj)./maximum(abs.(sol.v_adj))
+data["phase_p_adj"*mode]=angle.(sol.v_adj)
+data["discrete adjoint x"*mode]=real.(fd_sens[1,:])
+data["discrete adjoint y"*mode]=real.(fd_sens[2,:])
+data["discrete adjoint z"*mode]=real.(fd_sens[3,:])
+#data["finite difference"*mode]=real.(fd_sens_FD)
 #data["central finite difference"]=real.(sens_CFD)
 #data["diff DA -- FD"*mode]=abs.((sens.-sens_FD))
-vtk_write("shape_sense_v1_fine", mesh, data)
+vtk_write("shape_fd_sense_v1", mesh, data)
+
+# sens_FD=zeros(ComplexF64,size(mesh.points,2))
+# p = ProgressMeter.Progress(length(surface_points),desc="FD Sensitivity... ", dt=1,
+#      barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),
+#      barlen=20)
+# for idx=1:length(surface_points)
+#     #global G
+#     pnt_idx=surface_points[idx]
+#     crdnt=3
+#     #forward finite difference
+#     mesh_h=Mesh("mesh_h",deepcopy(mesh.points),mesh.lines,mesh.triangles,mesh.tetrahedra,mesh.domains,"constructed from mesh", mesh.tri2tet,[])
+#     h=1E-9
+#     mesh_h.points[crdnt,pnt_idx]+=h
+#     G=discretize(mesh_h, dscrp, C)
+#     sol, n, flag = householder(G,ω0,maxiter=4, output = false, n_eig_val=3)
+#     sens_FD[pnt_idx]=(sol.params[:ω]-ω0)/(h)
+#
+#     #update progressMeter
+#     ProgressMeter.next!(p)
+# end
 
 ##
-h=-1E-8
-mesh2=deepcopy(mesh)
-mesh2.points[3,surface_points[360]]+=h
-L2=discretize(mesh2, dscrp, C)
-##
-sol2, n, flag = householder(L2,ω0,maxiter=4, output = false, n_eig_val=2)
-
-##
-sens1=-v0Adj'*D(sol.params[:ω])*v0
-
-sens2=(sol2.params[:ω]-sol.params[:ω])/h
+# mode="[$(string(round((ω0/2/pi),digits=2)))]Hz"
+#
+# data=Dict()
+# data["abs_p"*mode]=abs.(sol.v0)./maximum(abs.(sol.v0))
+# data["phase_p"*mode]=angle.(sol.v0)
+# data["abs_p_adj"*mode]=abs.(sol.v0Adj)./maximum(abs.(sol.v0Adj))
+# data["phase_p_adj"*mode]=angle.(sol.v0Adj)
+# data["discrete adjoint x"*mode]=real.(sens1)
+# data["discrete adjoint y"*mode]=real.(sens2)
+# data["discrete adjoint z"*mode]=real.(sens3)
+# #data["finite difference"*mode]=real.(sens_FD)
+# #data["central finite difference"]=real.(sens_CFD)
+# #data["diff DA -- FD"*mode]=abs.((sens.-sens_FD))
+# vtk_write("shape_sense_v1_fine", mesh, data)
+#
+# ##
+# h=-1E-8
+# mesh2=deepcopy(mesh)
+# mesh2.points[3,surface_points[360]]+=h
+# L2=discretize(mesh2, dscrp, C)
+# ##
+# sol2, n, flag = householder(L2,ω0,maxiter=4, output = false, n_eig_val=2)
+#
+# ##
+# sens1=-v0Adj'*D(sol.params[:ω])*v0
+#
+# sens2=(sol2.params[:ω]-sol.params[:ω])/h
 
 ##    # #central finite difference failed because more elements need to be evaluated
     #sens_CFD=zeros(ComplexF64,size(mesh.points,2))
