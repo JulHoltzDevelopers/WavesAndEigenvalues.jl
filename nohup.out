@@ -1,65 +1,0 @@
-curl: (60) error setting certificate verify locations:
-  CAfile: /usr/share/centrifydc/apache/certs/ca-certs.crt
-  CApath: none
-
-More details here: http://curl.haxx.se/docs/sslcerts.html
-
-curl performs SSL certificate verification by default, using a "bundle"
- of Certificate Authority (CA) public keys (CA certs). The default
- bundle is named curl-ca-bundle.crt; you can specify an alternate file
- using the --cacert option.
-If this HTTPS server uses a certificate signed by a CA represented in
- the bundle, the certificate verification probably failed due to a
- problem with the certificate (it might be expired, or the name might
- not match the domain name in the URL).
-If you'd like to turn off curl's verification of the certificate, use
- the -k (or --insecure) option.
- Activating environment at `~/git/WavesAndEigenvalues_Private/Project.toml`
-    Cloning default registries into `~/.julia`
-    Cloning registry from "https://github.com/JuliaRegistries/General.git"
-      Added registry `General` to `~/.julia/registries/General`
-    Cloning [7d9fca2a-8960-54d3-9f78-7d1dccf2cb97] Arpack from https://github.com/JuliaLinearAlgebra/Arpack.jl.git
-  Installed Arpack ─────────────────────── v0.4.0
-    Cloning [1d5cc7b8-4909-519e-a0f8-d0f5ad9712d0] IntelOpenMP_jll from https://github.com/JuliaBinaryWrappers/IntelOpenMP_jll.jl.git
-  Installed IntelOpenMP_jll ────────────── v2018.0.3+0
-    Cloning [efe28fd5-8261-553b-a9e1-b2916fc3738e] OpenSpecFun_jll from https://github.com/JuliaBinaryWrappers/OpenSpecFun_jll.jl.git
-  Installed OpenSpecFun_jll ────────────── v0.5.3+3
-    Cloning [92933f4c-e287-5a05-a399-4b506db050ca] ProgressMeter from https://github.com/timholy/ProgressMeter.jl.git
-  Installed ProgressMeter ──────────────── v1.3.0
-    Cloning [276daf66-3868-5448-9aa4-cd146d93841b] SpecialFunctions from https://github.com/JuliaMath/SpecialFunctions.jl.git
-  Installed SpecialFunctions ───────────── v0.10.2
-    Cloning [621f4979-c628-5d54-868e-fcf4e3e8185c] AbstractFFTs from https://github.com/JuliaMath/AbstractFFTs.jl.git
-  Installed AbstractFFTs ───────────────── v0.5.0
-    Cloning [189a3867-3050-52da-a836-e630ba90ab69] Reexport from https://github.com/simonster/Reexport.jl.git
-  Installed Reexport ───────────────────── v0.2.0
-    Cloning [4536629a-c528-5b80-bd46-f80d51c5b363] OpenBLAS_jll from https://github.com/JuliaBinaryWrappers/OpenBLAS_jll.jl.git
-  Installed OpenBLAS_jll ───────────────── v0.3.9+4
-    Cloning [7a1cc6ca-52ef-59f5-83cd-3a7055c09341] FFTW from https://github.com/JuliaMath/FFTW.jl.git
-  Installed FFTW ───────────────────────── v1.2.1
-    Cloning [856f044c-d86e-5d09-b602-aeab76dc8ba7] MKL_jll from https://github.com/JuliaBinaryWrappers/MKL_jll.jl.git
-  Installed MKL_jll ────────────────────── v2019.0.117+2
-    Cloning [442a2c76-b920-505d-bb47-c5924d526838] FastGaussQuadrature from https://github.com/JuliaApproximation/FastGaussQuadrature.jl.git
-  Installed FastGaussQuadrature ────────── v0.4.2
-    Cloning [68821587-b530-5797-8361-c406ea357684] Arpack_jll from https://github.com/JuliaBinaryWrappers/Arpack_jll.jl.git
-  Installed Arpack_jll ─────────────────── v3.5.0+3
-    Cloning [e66e0078-7015-5450-92f7-15fbd957f2ae] CompilerSupportLibraries_jll from https://github.com/JuliaBinaryWrappers/CompilerSupportLibraries_jll.jl.git
-  Installed CompilerSupportLibraries_jll ─ v0.3.3+0
-    Cloning [f5851436-0d7a-5f13-b9de-f02708fd171a] FFTW_jll from https://github.com/JuliaBinaryWrappers/FFTW_jll.jl.git
-  Installed FFTW_jll ───────────────────── v3.3.9+5
-ERROR: LoadError: Unable to automatically install 'IntelOpenMP' from '/home/gmensah/.julia/packages/IntelOpenMP_jll/hsAKN/Artifacts.toml'
-Stacktrace:
- [1] error(::String) at ./error.jl:33
- [2] ensure_artifact_installed(::String, ::Dict{String,Any}, ::String; platform::Pkg.BinaryPlatforms.Platform, verbose::Bool, quiet_download::Bool) at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.4/Pkg/src/Artifacts.jl:894
- [3] ensure_all_artifacts_installed(::String; platform::Pkg.BinaryPlatforms.Platform, pkg_uuid::Nothing, include_lazy::Bool, verbose::Bool, quiet_download::Bool) at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.4/Pkg/src/Artifacts.jl:958
- [4] download_artifacts(::Pkg.Types.Context, ::Array{String,1}; platform::Pkg.BinaryPlatforms.Linux, verbose::Bool) at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.4/Pkg/src/Operations.jl:616
- [5] download_artifacts(::Pkg.Types.Context, ::Array{Pkg.Types.PackageSpec,1}; platform::Pkg.BinaryPlatforms.Linux, verbose::Bool) at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.4/Pkg/src/Operations.jl:595
- [6] instantiate(::Pkg.Types.Context; manifest::Nothing, update_registry::Bool, verbose::Bool, platform::Pkg.BinaryPlatforms.Linux, kwargs::Base.Iterators.Pairs{Union{},Union{},Tuple{},NamedTuple{(),Tuple{}}}) at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.4/Pkg/src/API.jl:820
- [7] instantiate(::Pkg.Types.Context) at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.4/Pkg/src/API.jl:748
- [8] #instantiate#116 at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.4/Pkg/src/API.jl:744 [inlined]
- [9] instantiate() at /buildworker/worker/package_linux64/build/usr/share/julia/stdlib/v1.4/Pkg/src/API.jl:744
- [10] top-level scope at /home/gmensah/git/WavesAndEigenvalues_Private/examples/shape/eth.jl:3
- [11] include(::Module, ::String) at ./Base.jl:377
- [12] exec_options(::Base.JLOptions) at ./client.jl:288
- [13] _start() at ./client.jl:484
-in expression starting at /home/gmensah/git/WavesAndEigenvalues_Private/examples/shape/eth.jl:3
-[?25l    Fetching: [>                                        ]  0.0 %    Fetching: [===========>                             ]  25.5 %    Fetching: [==================>                      ]  44.2 %    Fetching: [====================================>    ]  87.9 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h[?25l    Fetching: [>                                        ]  0.0 %[2K[?25h
