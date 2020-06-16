@@ -1,3 +1,8 @@
+import Pkg
+Pkg.activate(".")
+Pkg.instantiate()
+cd("./examples/shape")
+
 using WavesAndEigenvalues.Helmholtz
 import WavesAndEigenvalues.Meshutils: insert_smplx!, find_smplx,sort_smplx
 import Interpolations
