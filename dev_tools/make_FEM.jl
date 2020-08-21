@@ -1,5 +1,6 @@
 import SymPy
 x, y, z,a = SymPy.symbols("x y z a")
+b1, b2, b3, b4, b5, b6, b7, b8, b9, b10 = SymPy.symbols("b1 b2 b3 b4 b5 b6 b7 b8 b9 b10")
 c1, c2, c3, c4, c5, c6, c7, c8, c9, c10 = SymPy.symbols("c1 c2 c3 c4 c5 c6 c7 c8 c9 c10")
 A11, A12, A13, A22, A23, A33 = SymPy.symbols("A11 A12 A13 A22 A23 A33")
 A31, A21, A32 = A13, A12, A23
@@ -106,6 +107,8 @@ F= [[x,y,z,a], [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 ],
     [fh01, fh02,fh03,fh04,fh05,fh06,fh07,fh08,fh09,fh10,fh11,fh12,fh13,fh14,fh15,fh16,fh17,fh18,fh19,fh20],
     [fh01, fh02,fh03,fh04,fr05,fr06,fr07,fr08,fr09,fr10,fr11,fr12,fr13,fr14,fr15,fr16,fh17,fh18,fh19,fh20]]
 C= [[c1*x, c2*y, c3*z, c4*a,],[c1*f1, c2*f2, c3*f3, c4*f4, c5*f5, c6*f6, c7*f7, c8*f8, c9*f9, c10*f10 ],]
+b= [[b1*x, b2*y, b3*z, b4*a,],[b1*f1, b2*f2, b3*f3, b4*f4, b5*f5, b6*f6, b7*f7, b8*f8, b9*f9, b10*f10 ],]
+
 f = [f1, f2, f3, f4, f5, f6, f7, f8, f9, f10 ]
 ff=[f1,f4,f5,f7]
 surf=[[1,2,4],[1,2,4,5,7,9],[1 2 4 5 6 8 9 10 12 13 14 16 19],[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20]]
@@ -250,6 +253,8 @@ function local_matrix(order=1,corder=2, crdnt=0, crdnt_adj=0 ;symmetric=false,ty
                     intg=matmul(fj,A,fi)
                 elseif typ==:boundary
                     intg=(fj.subs(z,0)*fi.subs(z,0)).simplify()
+                elseif length(crdnt) == 2
+                    intg=fi*SymPy.diff(fj, X[crdnt[1]], X[crdnt[2]])
                 elseif  crdnt==0 && crdnt_adj==0
                     intg=(fi*fj).simplify()
                 elseif crdnt!=0 && crdnt_adj==0
@@ -360,17 +365,16 @@ function print_matrix(M,coeff=false,symmetric=false;diff="")
     txt=replace(txt,"B32"=>"B[3,2]")
     txt=replace(txt,"B33"=>"B[3,3]")
 
+    for i=1:10
+        txt=replace(txt,"c$i^2"=>"cc[$i,$i]")
+        txt=replace(txt,"b$i^2"=>"bb[$i,$i]")
+        for j=1:10
+            txt=replace(txt,"c$i*c$j"=>"cc[$i,$j]")
+            txt=replace(txt,"b$i*c$j"=>"bc[$i,$j]")
+            txt=replace(txt,"b$i*b$j"=>"bb[$i,$j]")
+        end
+    end
 
-    txt=replace(txt,"c1^2"=>"cc[1,1]")
-    txt=replace(txt,"c2^2"=>"cc[2,2]")
-    txt=replace(txt,"c3^2"=>"cc[3,3]")
-    txt=replace(txt,"c4^2"=>"cc[4,4]")
-    txt=replace(txt,"c1*c2"=>"cc[1,2]")
-    txt=replace(txt,"c1*c3"=>"cc[1,3]")
-    txt=replace(txt,"c1*c4"=>"cc[1,4]")
-    txt=replace(txt,"c2*c3"=>"cc[2,3]")
-    txt=replace(txt,"c2*c4"=>"cc[2,4]")
-    txt=replace(txt,"c3*c4"=>"cc[3,4]")
 
     println(txt)
     return txt
@@ -379,10 +383,13 @@ end
 #M =local_matrix(1,0) mass matrix
 #M=local_matrix(1,0,0,3)
 #M=local_matrix(1,diff(sum(C[1]),z),0)
-M=local_matrix(2,1,3,typ=:diff,symmetric=false)
-
-
-txt=print_matrix(M,true,false,diff="3")
+for i=1:3
+    M=local_matrix(3,sum(b[2])*sum(C[1]),i,typ=:diff,symmetric=false)
+    txt=print_matrix(M,true,false,diff="$i")
+    open("M$i$i.jl","w") do fid
+        write(fid,txt)
+    end
+end
 ## vectors
 
 M=local_vector(3,0,0,0,:boundary)

@@ -261,7 +261,7 @@ function string(sol::Solution)
   txt*="""
 
   Residual:
-  abs(λ) = $abs(sol.params[:λ])"""
+  abs(λ) = $(abs(sol.params[:λ]))"""
   return txt
 end
 function show(io::IO,sol::Solution)

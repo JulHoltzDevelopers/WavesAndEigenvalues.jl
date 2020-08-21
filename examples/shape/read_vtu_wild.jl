@@ -101,16 +101,3 @@ tri2tet=zeros(UInt32,length(triangles))
 tri2tet[1]=0xffffffff
 
 mesh=Mesh("mesh.vtu",Points,[],triangles,tetrahedra,domains,"mesh.vtu",tri2tet,1)
-##
-# function new_link_triangles_to_tetrahedra!(mesh::Mesh)
-#     for (idt,tet) in enumerate(mesh.tetrahedra)
-#         for tri in (tet[[1,2,3]],tet[[1,2,4]],tet[[1,3,4]],tet[[2,3,4]])
-#             idx,ins=sort_smplx(triangles,tri)
-#             if !ins
-#                 mesh.tri2tet[idx]=idt
-#             end
-#         end
-#     end
-#     return nothing
-# end
-# new_link_triangles_to_tetrahedra!(mesh)

@@ -183,7 +183,7 @@ function mult2str(mu)
  return txt
 end
 
-function generate_multi_indeces_at_order(k;to_disk=false,compressed=false)
+function generate_multi_indices_at_order(k;to_disk=false,compressed=false)
   if to_disk
     pack="../src/compressed_perturbation_data/" #This file location is relative to the deps directory as this is the one where build pkg is run.
     dir="$k/"
@@ -195,6 +195,8 @@ function generate_multi_indeces_at_order(k;to_disk=false,compressed=false)
 
     if to_disk && !ispath(pack*dir)
       mkpath(pack*dir)
+    else
+      continue
     end
     key=(0,n)
     p=[0]
@@ -246,15 +248,15 @@ function efficient_MN(N)
   MN=Array{Array{Array{Array{Int16,1},1},1}}(undef,N)
   #MN=[]
   for k =1:N
-  #push!(MN,generate_multi_indeces_at_order(k))
-  MN[k]=generate_multi_indeces_at_order(k)
+  #push!(MN,generate_multi_indices_at_order(k))
+  MN[k]=generate_multi_indices_at_order(k)
   end
   return MN
 end
 
 function disk_MN(N)
   for k=1:N
-    generate_multi_indeces_at_order(k,to_disk=true,compressed=true)
+    generate_multi_indices_at_order(k,to_disk=true,compressed=true)
   end
 end
 ##

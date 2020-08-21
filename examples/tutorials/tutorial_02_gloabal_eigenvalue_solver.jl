@@ -11,7 +11,7 @@
 # [2] P.E. Buschmann, G.A. Mensah, J.P. Moeck, Solution of Thermoacoustic Eigenvalue Problems with a Non-Iterative Method, J. Eng. Gas Turbines Power, Mar 2020, 142(3): 031022 (11 pages) https://doi.org/10.1115/1.4045076
 
 ## #jl
-# ## Model set up.
+# ## Model set-up.
 # The model is the same Rijke tube configuration as in Tutorial 01:
 using WavesAndEigenvalues.Helmholtz
 mesh=Mesh("Rijke_mm.msh",scale=0.001) #load mesh
