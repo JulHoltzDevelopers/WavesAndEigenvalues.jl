@@ -1,7 +1,0 @@
-ERROR: LoadError: UndefVarError: Pkg not defined
-Stacktrace:
- [1] top-level scope at /home/gmensah/git/WavesAndEigenvalues_Private/examples/shape/eth.jl:1
- [2] include(::Module, ::String) at ./Base.jl:377
- [3] exec_options(::Base.JLOptions) at ./client.jl:288
- [4] _start() at ./client.jl:484
-in expression starting at /home/gmensah/git/WavesAndEigenvalues_Private/examples/shape/eth.jl:1

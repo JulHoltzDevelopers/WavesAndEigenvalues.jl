@@ -30,8 +30,8 @@ D["Interior"]=(:interior,())
 D["Outlet_high"]=(:admittance, (:Y_in,1E15))
 D["Outlet_low"]=(:admittance, (:Y_out,1E15))
 ##discretize models
-L=discretize(full_mesh, D, C, el_type=1, c_type=0)
-l=discretize(unit_mesh, D, c, el_type=1, c_type=0,b=:b)
+L=discretize(full_mesh, D, C, order=:1,)
+l=discretize(unit_mesh, D, c, order=:1,b=:b)
 ## solve model using beyn
 #(type Γ by typing \Gamma and Enter)
 Γ=[150.0+5.0im, 150.0-5.0im, 1000.0-5.0im, 1000.0+5.0im].*2*pi #corner points for the contour (in this case a rectangle)
