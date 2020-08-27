@@ -14,7 +14,9 @@ function outer(ii,aa,jj,bb)
     #TODO: conversion to array
     return II,JJ,mm
 end
-function helmhol(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=true)
+
+
+function helmhol(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=true, source=false)
     triangles,tetrahedra,dim=aggregate_elements(mesh,order)
     N_points=size(mesh.points,2)
 
@@ -147,15 +149,27 @@ function helmhol(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=tru
         end
     end
 
+    function wallsrc(J)
+        if order==:1
+            return s33v1(J)
+        elseif order==:2
+            return s33v2(J)
+        elseif order==:h
+            return s33vh(J)
+    end
 
-    #initialize linear operator family
+
+    #initialize linear operator family...
     L=LinearOperatorFamily(["ω","λ"],complex([0.,Inf]))
+    #...and source vector
+    rhs=LinearOperatorFamily(["ω"],complex([0.,]))
 
 
-    ## build matrices from domain definitions
+    ## build discretization matrices and vectors from domain definitions
     for (domain,(type,data)) in dscrp
         if type==:interior
             make=[:M,:K]
+            matrix=true #sentinel value to toggle assembley of matrix (true) or vector (false)
 
         elseif type==:admittance
             make=[:C]
@@ -182,6 +196,8 @@ function helmhol(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=tru
                 boundary_txt=adm_txt
             end
 
+            matrix=true
+
         elseif type==:flame #TODO: unified interface with flameresponse and normalize n_ref
             make=[:Q]
             gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val=data
@@ -196,6 +212,8 @@ function helmhol(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=tru
             flame_arg=((n_sym,),(:ω,tau_sym))
             flame_txt="$(string(n_sym))*exp(-iω$(string(tau_sym)))"
 
+            matrix=true
+
         elseif type==:flameresponse
             make=[:Q]
             gamma,rho,nglobal,x_ref,n_ref,eps_sym,eps_val=data
@@ -206,6 +224,9 @@ function helmhol(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=tru
             flame_func=(pow1,)
             flame_arg=((eps_sym,),)
             flame_txt="$(string(eps_sym))"
+
+            matrix=true
+
         elseif type==:fancyflame
             make=[:Q]
             gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym, a_sym, n_val, tau_val, a_val=data
@@ -223,6 +244,13 @@ function helmhol(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=tru
             flame_func=(pow1,exp_ax2mxit,)
             flame_arg=((n_sym,),(:ω,tau_sym,a_sym,))
             flame_txt="$(string(n_sym))* exp($(string(a_sym))ω^2-iω$(string(tau_sym)))"
+            matrix=true
+
+        elseif type==:loudspeaker
+            make=[:m]
+            loud_sym,loud_val=data
+            matrix=false
+
         else
             make=[]
         end
@@ -293,16 +321,35 @@ function helmhol(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=tru
                 arg=flame_arg
                 txt=flame_txt
                 mat="Q"
+            elseif opr==:m
+                for (smplx,c) in zip(triangles[mesh.domains[domain]["simplices"]],C_tri[mesh.domains[domain]["simplices"]])
+                    CT=CooTrafo(mesh.points[:,smplx[1:3]])
+                    ii=smplx[:]
+                    vv=wallsrc(CT,c)
+                    append!(V,vv[:])
+                    append!(I,ii[:])
+                end
+                func=(pow1,pow1,)
+                arg=((:ω,),(loud_sym,),)
+                txt="speaker"
+                mat="m"
             end
 
-            if bloch
-                for (i,j,v,f,a,t) in zip(blochify(I,J,V,naxis,nxbloch,nsector,naxis_ln,nsector_ln,N_points)...,[(),(exp_plus,),(exp_minus,),(bloch_filt,),(bloch_exp_plus,),(bloch_exp_minus,),],[(), ((b,),), ((b,),),((b,),),((b,),),((b,),),], ["", txt_plus, txt_minus, txt_filt, txt_filt_plus, txt_filt_minus,])
-                    M =SparseArrays.sparse(i,j,v,dim,dim)
-                    push!(L,Term(M,(func...,f...),(arg...,a...),txt*t,mat))
+            if matrix
+                #assemble discretization matrices in sparse format
+                if bloch
+                    for (i,j,v,f,a,t) in zip(blochify(I,J,V,naxis,nxbloch,nsector,naxis_ln,nsector_ln,N_points)...,[(),(exp_plus,),(exp_minus,),(bloch_filt,),(bloch_exp_plus,),(bloch_exp_minus,),],[(), ((b,),), ((b,),),((b,),),((b,),),((b,),),], ["", txt_plus, txt_minus, txt_filt, txt_filt_plus, txt_filt_minus,])
+                        M =SparseArrays.sparse(i,j,v,dim,dim)
+                        push!(L,Term(M,(func...,f...),(arg...,a...),txt*t,mat))
+                    end
+                else
+                    M =SparseArrays.sparse(I,J,V,dim,dim)
+                    push!(L,Term(M,func,arg,txt,mat))
                 end
             else
-                M =SparseArrays.sparse(I,J,V,dim,dim)
-                push!(L,Term(M,func,arg,txt,mat))
+                #assemble discretization vectors in sparse format
+                M=SparseArrays.sparsevec(I,V,dim)
+                push!(rhs,Term(M,func,arg,txt,mat))
             end
 
         end
@@ -356,7 +403,12 @@ function helmhol(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=tru
         M=SparseArrays.sparse(I,J,-V,dim,dim)
     end
     push!(L,Term(M,(pow1,),((:λ,),),"-λ","__aux__"))
-    return L
+
+    if source #experimental return mode returning the source term
+        return L,rhs
+    else #classic return mode
+        return L
+    end
 end
 ##
 mesh=Mesh("./examples/tutorials/rect_tube.msh",scale=0.001)

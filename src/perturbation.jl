@@ -190,20 +190,19 @@ function generate_multi_indices_at_order(k;to_disk=false,compressed=false)
   else
     Mu=[ Array{Int16,1}[] for i in 1:tuple2idx((k,0),k) ] #TODO specify type
   end
-
+  if to_disk && !ispath(pack*dir)
+    mkpath(pack*dir)
+  end
   for n=1:k
-
-    if to_disk && !ispath(pack*dir)
-      mkpath(pack*dir)
-    else
-      continue
-    end
     key=(0,n)
     p=[0]
     mu=part2mult(p)
     out=compressed ? p :  mu
+    println("n and k : $n and $k")
+    println("key: $key")
     if to_disk
       fname="$(key[1])_$(key[2])"
+      println("fname: $fname")
       open(pack*dir*fname,"a") do file
         write(file,mult2str(out))
       end

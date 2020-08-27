@@ -41,6 +41,113 @@ function create_indices(elmnt1,elmnt2)
     end
     return ii, jj
 end
+
+
+
+## the following two functions should be eventually moved to meshutils once the revision of FEM is done.
+function collect_triangles(mesh::Mesh)
+    inner_triangles=[]
+    for tet in mesh.tetrahedra
+        for tri in [tet[[1,2,3]],tet[[1,2,4]],tet[[1,3,4]],tet[[2,3,4]] ]
+            idx=find_smplx(mesh.triangles,tri)
+            if idx==0
+                insert_smplx!(inner_triangles,tri)
+            end
+        end
+    end
+    return inner_triangles
+end
+
+##
+
+##
+
+
+import ..Meshutils: get_line_idx
+function aggregate_elements(mesh::Mesh, el_type=:1)
+    N_points=size(mesh.points)[2]
+    if (el_type in (:2,:h) ) &&  length(mesh.lines)==0
+        collect_lines!(mesh)
+    end
+
+    if el_type==:1
+        tetrahedra=mesh.tetrahedra
+        triangles=mesh.triangles
+        dim=N_points
+    elseif el_type==:2
+        triangles=Array{Array{UInt32,1}}(undef,length(mesh.triangles))
+        tetrahedra=Array{Array{UInt32,1}}(undef,length(mesh.tetrahedra))
+        tet=Array{UInt32}(undef,10)
+        tri=Array{UInt32}(undef,6)
+        for (idx,smplx) in enumerate(mesh.tetrahedra)
+            tet[1:4]=smplx[:]
+            tet[5]=get_line_idx(mesh,smplx[[1,2]])+N_points#find_smplx(mesh.lines,smplx[[1,2]])+N_points #TODO: type stability
+            tet[6]=get_line_idx(mesh,smplx[[1,3]])+N_points
+            tet[7]=get_line_idx(mesh,smplx[[1,4]])+N_points
+            tet[8]=get_line_idx(mesh,smplx[[2,3]])+N_points
+            tet[9]=get_line_idx(mesh,smplx[[2,4]])+N_points
+            tet[10]=get_line_idx(mesh,smplx[[3,4]])+N_points
+            tetrahedra[idx]=copy(tet)
+        end
+        for (idx,smplx) in enumerate(mesh.triangles)
+            tri[1:3]=smplx[:]
+            tri[4]=get_line_idx(mesh,smplx[[1,2]])+N_points
+            tri[5]=get_line_idx(mesh,smplx[[1,3]])+N_points
+            tri[6]=get_line_idx(mesh,smplx[[2,3]])+N_points
+            triangles[idx]=copy(tri)
+        end
+        dim=N_points+length(mesh.lines)
+    elseif el_type==:h
+        #if mesh.tri2tet[1]==0xffffffff
+        #    link_triangles_to_tetrahedra!(mesh)
+        #end
+        inner_triangles=collect_triangles(mesh) #TODO integrate into mesh structure
+        triangles=Array{Array{UInt32,1}}(undef,length(mesh.triangles))
+        tetrahedra=Array{Array{UInt32,1}}(undef,length(mesh.tetrahedra))
+        tet=Array{UInt32}(undef,20)
+        tri=Array{UInt32}(undef,13)
+        for (idx,smplx) in enumerate(mesh.triangles)
+            tri[1:3]  =  smplx[:]
+            tri[4:6]  =  smplx[:].+N_points
+            tri[7:9]  =  smplx[:].+2*N_points
+            tri[10:12]  =  smplx[:].+3*N_points
+            fcidx     =  find_smplx(mesh.triangles,smplx)
+            if fcidx !=0
+                tri[13]   =  fcidx+4*N_points
+            else
+                tri[13]   =  find_smplx(inner_triangles,smplx)+4*N_points+length(mesh.triangles)
+            end
+            triangles[idx]=copy(tri)
+        end
+        for (idx, smplx) in enumerate(mesh.tetrahedra)
+            tet[1:4] = smplx[:]
+            tet[5:8] = smplx[:].+N_points
+            tet[9:12] = smplx[:].+2*N_points
+            tet[13:16]= smplx[:].+3*N_points
+
+            for (jdx,tria) in enumerate([smplx[[2,3,4]],smplx[[1,3,4]],smplx[[1,2,4]],smplx[[1,2,3]]])
+                fcidx     =  find_smplx(mesh.triangles,tria)
+                if fcidx !=0
+                    tet[16+jdx]   =  fcidx+4*N_points
+                else
+                    fcidx=find_smplx(inner_triangles,tria)
+                    if fcidx==0
+                        println("Error, face not found!!!")
+                        return nothing
+                    end
+                    tet[16+jdx]   =  fcidx+4*N_points+length(mesh.triangles)
+                end
+            end
+            tetrahedra[idx]=copy(tet)
+        end
+        dim=4*N_points+length(mesh.triangles)+length(inner_triangles)
+    end
+    return triangles, tetrahedra, dim
+end
+##
+
+
+
 function recombine_hermite(J::CooTrafo,M)
         A=zeros(ComplexF64,size(M))
         J=J.trafo

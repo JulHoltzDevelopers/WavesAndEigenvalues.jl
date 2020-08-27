@@ -226,7 +226,7 @@ sol_actv.params[:ω]/2/pi
 # utilizing high-order perturbation theory. For instance this gives you
 # the 30th order diagonal Padé estimate expanded from the passive solution.
 
-perturb_fast!(sol,L,:n,30) #compute the coefficients
+perturb_fast!(sol,L,:n,2) #compute the coefficients
 freq(n)=sol(:n,n,15,15)/2/pi #create some function for convenience
 freq(1) #evaluate the function at any value for `n` you are interested in.
 

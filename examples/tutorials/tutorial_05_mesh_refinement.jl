@@ -1,7 +1,7 @@
 ## standard example
 using WavesAndEigenvalues.Helmholtz
 mesh=Mesh("Rijke_mm.msh",scale=0.001)
-dscrp=Dict() #initialize model discreptor
+dscrp=Dict() #initialize model descriptor
 dscrp["Interior"]=(:interior, ()) #define resonant cavity
 dscrp["Outlet"]=(:admittance, (:Y,1E15)) #specify outlet BC
 γ=1.4 #ratio of specific heats
