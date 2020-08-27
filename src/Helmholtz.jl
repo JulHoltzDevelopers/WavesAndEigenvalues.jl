@@ -71,6 +71,12 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
         end
     end
 
+
+    #initialize linear operator family...
+    L=LinearOperatorFamily(["ω","λ"],complex([0.,Inf]))
+    #...and source vector
+    rhs=LinearOperatorFamily(["ω"],complex([0.,]))
+
     if b!=:__none__
         bloch=true
         naxis=mesh.dos.naxis
@@ -192,11 +198,6 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
         end
     end
 
-
-    #initialize linear operator family...
-    L=LinearOperatorFamily(["ω","λ"],complex([0.,Inf]))
-    #...and source vector
-    rhs=LinearOperatorFamily(["ω"],complex([0.,]))
 
 
     ## build discretization matrices and vectors from domain definitions
@@ -416,14 +417,14 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
         if 0<naxis #modify axis dof for essential boundary condition when blochwave number !=0
             DI=1:naxis
             DV=ones(ComplexF64,naxis) #TODO: make this more compact
-            if el_type==2
+            if order==:2
                 DI=vcat(DI,(N_points+1:naxis_ln).-nxbloch)
                 DV=vcat(DV,ones(ComplexF64,naxis_ln-N_points))
             end
             for idx=1:naxis
                 DV[idx]=1/M[idx,idx]
             end
-            if el_type==2
+            if order==:2
                 for (idx,ii) in enumerate((N_points+1:naxis_ln).-nxbloch)
                     DV[idx+naxis]=1/M[ii,ii]
                 end

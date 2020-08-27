@@ -21,7 +21,7 @@ function discrete_adjoint_shape_sensitivity(mesh::Mesh,dscrp,C,surface_points,tr
     v0=sol.v
     v0Adj=sol.v_adj
     v0/=sqrt(v0'*v0)
-    v0Adj/=v0Adj'*L(sol.params[sol.eigval],1)*v0
+    v0Adj/=conj(v0Adj'*L(sol.params[sol.eigval],1)*v0)
 
     #detect unit mesh
     unit=false
@@ -84,6 +84,9 @@ function discrete_adjoint_shape_sensitivity(mesh::Mesh,dscrp,C,surface_points,tr
                 #    continue
                 elseif pnt_idx<=mesh.dos.naxis
                     #skip analysis if pnt is axis pnt
+                    if output
+                        ProgressMeter.next!(p)
+                    end
                     continue
                 end
         end
@@ -96,21 +99,21 @@ function discrete_adjoint_shape_sensitivity(mesh::Mesh,dscrp,C,surface_points,tr
             if unit
                 X=get_cylindrics(pnt)
                 mesh_h.points[:,pnt_idx].+=h.*X[:,crdnt]
-                #if bloch
-                #    mesh_h.points[:,pnt_bloch_idx]=pnt_bloch
-                #    X_bloch=get_cylindrics(pnt_bloch)
-                #    #println("####X:$X")
-                #    mesh_h.points[:,pnt_bloch_idx].+=h.*X_bloch[:,crdnt]
-                #end
+                if bloch
+                   mesh_h.points[:,pnt_bloch_idx]=pnt_bloch
+                   X_bloch=get_cylindrics(pnt_bloch)
+                   println("####X: $pnt_idx")
+                   mesh_h.points[:,pnt_bloch_idx].+=h.*X_bloch[:,crdnt]
+                end
             else
                 mesh_h.points[crdnt,pnt_idx]+=h
             end
             D_right=discretize(mesh_h, dscrp, C, mass_weighting=false,b=b)
             if unit
                 mesh_h.points[:,pnt_idx].-=2*h.*X[:,crdnt]
-                #if bloch
-                #    mesh_h.points[:,pnt_bloch_idx].-=2*h.*X_bloch[:,crdnt]
-                #end
+                if bloch
+                   mesh_h.points[:,pnt_bloch_idx].-=2*h.*X_bloch[:,crdnt]
+                end
             else
                 mesh_h.points[crdnt,pnt_idx]-=2h
             end
@@ -238,17 +241,12 @@ end
 ## FD approach
 function forward_finite_differences_shape_sensitivity(mesh::Mesh,dscrp,C,surface_points,tri_mask,tet_mask,L,sol;h=1E-9,output=true)
     #check whether is unit mesh
-    unit=false
+    unit=0
     if mesh.dos!=1
         unit=mesh.dos.unit
     end
 
     sens=zeros(ComplexF64,size(mesh.points))
-    if output
-        p = ProgressMeter.Progress(length(surface_points),desc="FD Sensitivity... ", dt=1,
-             barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),
-             barlen=20)
-    end
 
     if unit
         n_iterations=length(surface_points)-mesh.dos.nxbloch
@@ -256,50 +254,80 @@ function forward_finite_differences_shape_sensitivity(mesh::Mesh,dscrp,C,surface
         n_iterations=length(surface_points)
     end
 
+    if output
+        p = ProgressMeter.Progress(n_iterations,desc="FD Sensitivity... ", dt=1,
+             barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),
+             barlen=20)
+    end
+
+
+
     for idx=1:n_iterations
         #global G
         pnt_idx=surface_points[idx]
         domains=assemble_connected_domain(idx,mesh::Mesh,dscrp,tri_mask,tet_mask)
 
-        #construct mesh with reduced domains
-        mesh_h=Mesh("mesh_h",deepcopy(mesh.points),mesh.lines,mesh.triangles,mesh.tetrahedra,domains,"constructed from mesh", mesh.tri2tet,[])
-        #get cooridnates of current surface point
-        pnt=mesh_h.points[:,pnt_idx]
 
+        #get coordinates of current surface point
+        pnt=mesh.points[:,pnt_idx]
         for crdnt=1:3
-        #forward finite difference
+            #construct mesh with reduced domains
+            mesh_h=Mesh("mesh_h",deepcopy(mesh.points),mesh.lines,mesh.triangles,mesh.tetrahedra,domains,"constructed from mesh", mesh.tri2tet,mesh.dos)
+            mesh_hl=deepcopy(mesh_h)
+            #forward finite difference
             #mesh_h.points[crdnt,pnt_idx]+=h
             #G=discretize(mesh_h, dscrp, C)
-            D_center=discretize(mesh_h, dscrp, C, mass_weighting=true)
-            if unit
+            #D_center=discretize(mesh_h, dscrp, C, mass_weighting=true)
+            if unit>0
                 X=get_cylindrics(pnt)
                 mesh_h.points[:,pnt_idx].+=h.*X[:,crdnt]
-                bidx=pnt_idx-mesh.dos.naxis #(potential) bloch point index
-                if 0 < bidx <= mesh.dos.nxbloch
-                    mesh_h.points[:,bidx]=mesh_h.points[:,pnt_idx]
-                    mesh_h.points[2,bidx]*=-1
+                mesh_hl.points[:,pnt_idx].-=h.*X[:,crdnt]
+                #bidx=pnt_idx-mesh.dos.naxis #(potential) bloch point index
+                #if 0 < bidx <= mesh.dos.nxbloch
+                if 0 < pnt_idx-mesh.dos.naxis <= mesh.dos.nxbloch
+                    #identify bloch image point
+                    bidx=size(mesh.points,2)-mesh.dos.nxbloch+(pnt_idx-mesh.dos.naxis)
+                    bpnt=mesh.points[:,bidx]
+                    bX=get_cylindrics(bpnt)
+                    mesh_h.points[:,bidx].+=h.*bX[:,crdnt]
+                    mesh_hl.points[:,bidx].-=h.*bX[:,crdnt]
+                    # wrong
+                    # mesh_h.points[:,bidx]=mesh_h.points[:,pnt_idx]
+                    # mesh_h.points[2,bidx]*=-1 #wrong
                 else
                     bidx=0 #sentinel value
                 end
             else
                 mesh_h.points[crdnt,pnt_idx]+=h
+                mesh_hl.points[crdnt,pnt_idx]-=h
             end
-            D_right=discretize(mesh_h, dscrp, C, mass_weighting=true)
-            G=deepcopy(L)
+            if unit>0
+                D_right=discretize(mesh_h, dscrp, C, mass_weighting=true,b=:b)
+                D_left=discretize(mesh_hl, dscrp, C, mass_weighting=true,b=:b)
+            else
+                D_right=discretize(mesh_h, dscrp, C, mass_weighting=true)
+                D_left=discretize(mesh_hl, dscrp, C, mass_weighting=true)
+            end
+            #G=deepcopy(L)
             G=LinearOperatorFamily(["ω","λ"],complex([0.,Inf]))
             for (key,val) in L.params
                 G.params[key]=val
             end
-            for idx in 1:length(D_center.terms)
-                coeff=L.terms[idx].coeff+D_right.terms[idx].coeff-D_center.terms[idx].coeff
+            for idx in 1:length(D_left.terms)
+                symbol=L.terms[idx].symbol
+                if symbol!="__aux__"
+                    coeff=L.terms[idx].coeff+D_right.terms[idx].coeff-D_left.terms[idx].coeff
+                else
+                    coeff=L.terms[idx].coeff
+                end
                 func=L.terms[idx].func
                 operator=L.terms[idx].operator
                 params=L.terms[idx].params
-                symbol=L.terms[idx].symbol
+
                 push!(G,Term(coeff,func,params,symbol,operator))
             end
             new_sol, n, flag = householder(G,sol.params[sol.eigval],maxiter=5, output = false, n_eig_val=3,order=3)
-            sens[crdnt,pnt_idx]=(new_sol.params[new_sol.eigval]-sol.params[sol.eigval])/(h)
+            sens[crdnt,pnt_idx]=(new_sol.params[new_sol.eigval]-sol.params[sol.eigval])/(2h)
         end
 
         if output
