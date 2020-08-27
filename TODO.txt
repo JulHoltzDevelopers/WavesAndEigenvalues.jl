@@ -3,7 +3,7 @@ Evaluation of Frequency response (Ale)
 	- "Loudspeaker" (prescribed velocity field on a boundary)
 	- Flame
 	- Resolvant analysis
-	
+
 Using a frequency-dependent response
 
  	- as a BC: done (impedance in term of state space formulation)
@@ -16,5 +16,8 @@ Tutorials
 	- Damper's tutorial
 	- Identifying EPs
 	- Symmetry breaking
+	- Loudspeaker
 
 Doctests
+
+Shell script for interfacing public and private reps
