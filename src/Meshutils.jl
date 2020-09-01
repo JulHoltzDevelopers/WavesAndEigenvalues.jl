@@ -837,6 +837,20 @@ function get_surface_points(mesh::Mesh,output::Bool=true)
             ProgressMeter.next!(p)
         end
     end
+
+    if mesh.dos!=1 && mesh.dos.unit
+        #blochify surface points
+        for idx in surface_points
+            bidx=idx -mesh.dos.naxis
+            if 0 < bidx <= mesh.dos.nxbloch
+                append!(tri_mask[idx],tri_mask[end-mesh.dos.nxbloch+bidx])
+                append!(tet_mask[idx],tet_mask[end-mesh.dos.nxbloch+bidx])
+                unique!(tri_mask)
+                unique!(tet_mask)
+            end
+        end
+    end
+    
     return surface_points, tri_mask, tet_mask
 end
 # function get_surface_points(mesh::Mesh,output::Bool=true)

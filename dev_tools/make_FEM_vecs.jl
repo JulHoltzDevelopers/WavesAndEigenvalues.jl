@@ -23,6 +23,8 @@ function local_vector(order=1,corder=2, crdnt=0, crdnt_adj=0, typ=:none )
             M[i,1]=tri_integrate((fi*coeff).subs(z, 0).simplify()).simplify()
         elseif typ==:gradient
             M[i,:]=grad(fi*coeff)
+        elseif typ==:monopole
+            M[i,1]=fi*coeff
         else
             M[i,1]=tet_integrate(fi*coeff).simplify()
         end
@@ -93,10 +95,10 @@ end
 
 
 
+## make it
+M=local_vector(3,0,0,0,:monopole)
 
-M=local_vector(3,0,0,0,:vol)
+txt=print_matrix(M,true);
 
-txt=print_matrix(M,false)
-
-txt=replace(txt,";"*'\n'=>" ")
+txt=replace(txt,";"*'\n'=>" ");
 println(txt)

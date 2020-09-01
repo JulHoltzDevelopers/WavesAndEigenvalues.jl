@@ -211,7 +211,11 @@ import Base.show
 function show(io::IO,L::LinearOperatorFamily)
   if !isempty(L.terms)
     shape=size(L.terms[1].coeff)
-    txt="$(shape[1])×$(shape[2]) dimensional operator family: \n\n"
+    if length(shape)==2
+      txt="$(shape[1])×$(shape[2])-dimensional operator family: \n\n"
+    else
+      txt="$(shape[1])-dimensional vector family: \n\n"
+    end
   else
     txt="empty operator family\n\n"
   end

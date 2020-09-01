@@ -2357,3 +2357,44 @@ end
 function s33vh(J::CooTrafo)
         return  recombine_hermite(J,[11/120  11/120  11/120  -1/60  1/120  1/120  1/120  -1/60  1/120  0 0 0 9/40])*abs(J.det)
 end
+
+function s33v1c1(J::CooTrafo,c)
+    c1,c2,c4=c
+    M=Array{ComplexF64}(undef,3)
+    M[1]=c1/12 + c2/24 + c4/24
+    M[2]=c1/24 + c2/12 + c4/24
+    M[3]=c1/24 + c2/24 + c4/12
+    return M*abs(J.det)
+end
+
+
+function s33v2c1(J::CooTrafo,c)
+    c1,c2,c4=c
+    M=Array{ComplexF64}(undef,6)
+    M[1]=c1/60 - c2/120 - c4/120
+    M[2]=-c1/120 + c2/60 - c4/120
+    M[3]=-c1/120 - c2/120 + c4/60
+    M[4]=c1/15 + c2/15 + c4/30
+    M[5]=c1/15 + c2/30 + c4/15
+    M[6]=c1/30 + c2/15 + c4/15
+    return M*abs(J.det)
+end
+
+function s33vhc1(J::CooTrafo,c)
+    c1,c2,c4=c
+    M=Array{ComplexF64}(undef,13)
+    M[1]=23*c1/360 + c2/72 + c4/72
+    M[2]=c1/72 + 23*c2/360 + c4/72
+    M[3]=c1/72 + c2/72 + 23*c4/360
+    M[4]=-c1/90 - c2/360 - c4/360
+    M[5]=c1/360 + c2/180
+    M[6]=c1/360 + c4/180
+    M[7]=c1/180 + c2/360
+    M[8]=-c1/360 - c2/90 - c4/360
+    M[9]=c2/360 + c4/180
+    M[10]=0
+    M[11]=0
+    M[12]=0
+    M[13]=3*c1/40 + 3*c2/40 + 3*c4/40
+    return recombine_hermite(J,M)*abs(J.det)
+end
