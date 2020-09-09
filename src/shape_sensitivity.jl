@@ -248,7 +248,7 @@ function forward_finite_differences_shape_sensitivity(mesh::Mesh,dscrp,C,surface
 
     sens=zeros(ComplexF64,size(mesh.points))
 
-    if unit
+    if unit!=0
         n_iterations=length(surface_points)-mesh.dos.nxbloch
     else
         n_iterations=length(surface_points)

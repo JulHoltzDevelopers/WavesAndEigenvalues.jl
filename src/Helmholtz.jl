@@ -288,19 +288,35 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
             make=[:Q]
             gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym, a_sym, n_val, tau_val, a_val=data
             nlocal=(gamma-1)/rho*nglobal/compute_size!(mesh,domain)
-            if n_sym ∉ keys(L.params)
-                L.params[n_sym]=n_val
-            end
-            if tau_sym ∉ keys(L.params)
-                L.params[tau_sym]=tau_val
-            end
-            if a_sym ∉ keys(L.params)
-                L.params[a_sym]=a_val
-            end
 
-            flame_func=(pow1,exp_ax2mxit,)
-            flame_arg=((n_sym,),(:ω,tau_sym,a_sym,))
-            flame_txt="$(string(n_sym))* exp($(string(a_sym))ω^2-iω$(string(tau_sym)))"
+            if typeof(n_val)<:Number #TODO: sanity check that other lists are same length
+                if n_sym ∉ keys(L.params)
+                    L.params[n_sym]=n_val
+                end
+                if tau_sym ∉ keys(L.params)
+                    L.params[tau_sym]=tau_val
+                end
+                if a_sym ∉ keys(L.params)
+                    L.params[a_sym]=a_val
+                end
+
+                flame_func=(pow1,exp_az2mzit,)
+                flame_arg=((n_sym,),(:ω,tau_sym,a_sym,))
+                flame_txt="$(string(n_sym))* exp($(string(a_sym))ω^2-iω$(string(tau_sym)))"
+            else
+                flame_arg=(:ω,)
+                flame_txt=""
+                for (ns, ts, as, nv, tv, av) in zip(n_sym, tau_sym, a_sym, n_val, tau_val,a_val)
+                    L.params[ns]=nv
+                    L.params[ts]=tv
+                    L.params[as]=av
+                    flame_arg=(flame_arg...,ns,ts,as,)
+                    flame_txt*="[$(string(ns))* exp($(string(as))ω^2-iω$(string(ts)))+"
+                end
+                flame_txt=flame_txt[1:end-1]*"]"
+                flame_arg=(flame_arg,)
+                flame_func=(Σnexp_az2mzit,)
+            end
 
         else
             make=[]
