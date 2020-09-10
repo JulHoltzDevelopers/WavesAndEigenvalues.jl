@@ -102,7 +102,7 @@ function discrete_adjoint_shape_sensitivity(mesh::Mesh,dscrp,C,surface_points,tr
                 if bloch
                    mesh_h.points[:,pnt_bloch_idx]=pnt_bloch
                    X_bloch=get_cylindrics(pnt_bloch)
-                   println("####X: $pnt_idx")
+                   #println("####X: $pnt_idx")
                    mesh_h.points[:,pnt_bloch_idx].+=h.*X_bloch[:,crdnt]
                 end
             else
