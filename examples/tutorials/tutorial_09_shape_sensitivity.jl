@@ -1,8 +1,12 @@
 #shape example.
+
+
+import Pkg
+Pkg.activate(".")
 using WavesAndEigenvalues.Helmholtz
 
 ##
-mesh=Mesh("Rijke_mm.msh",scale=0.001)
+mesh=Mesh("./examples/tutorials/Rijke_mm.msh",scale=0.001)
 case="Rijke_test"
 h=1E-9
 mesh=octosplit(mesh);case*="_fine"  #activate this line to refine the mesh
