@@ -258,7 +258,16 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
 
         elseif type==:flame #TODO: unified interface with flameresponse and normalize n_ref
             make=[:Q]
-            gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val=data
+            if length(data)==9
+                gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val=data
+                ref_idx=0
+            elseif length(data)==10
+                gamma,rho,nglobal,ref_idx,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val=data
+            else
+             println("Erroro: Data length does not matc :flame option!")
+            end
+
+
             nlocal=(gamma-1)/rho*nglobal/compute_size!(mesh,domain)
             if n_sym ∉ keys(L.params)
                 L.params[n_sym]=n_val
@@ -274,6 +283,7 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
         elseif type==:flameresponse
             make=[:Q]
             gamma,rho,nglobal,x_ref,n_ref,eps_sym,eps_val=data
+            ref_idx=0
             nlocal=(gamma-1)/rho*nglobal/compute_size!(mesh,domain)
             if eps_sym ∉ keys(L.params)
                 L.params[eps_sym]=eps_val
@@ -287,6 +297,7 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
         elseif type==:fancyflame
             make=[:Q]
             gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym, a_sym, n_val, tau_val, a_val=data
+            ref_idx=0
             nlocal=(gamma-1)/rho*nglobal/compute_size!(mesh,domain)
 
             if typeof(n_val)<:Number #TODO: sanity check that other lists are same length
@@ -380,7 +391,9 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                     append!(S,mm[:])
                     append!(I,smplx[:])
                 end
-                ref_idx=find_tetrahedron_containing_point(mesh,x_ref)
+                if ref_idx!=0
+                    ref_idx=find_tetrahedron_containing_point(mesh,x_ref)
+                end
                 smplx=tetrahedra[ref_idx]
                 CT=CooTrafo(mesh.points[:,smplx[1:4]])
                 mm=gradsrc(CT,n_ref,x_ref)

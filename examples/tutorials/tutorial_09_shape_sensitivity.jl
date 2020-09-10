@@ -1,11 +1,9 @@
 #shape example.
-
-
 import Pkg
 Pkg.activate(".")
 using WavesAndEigenvalues.Helmholtz
 
-##
+## configure set-up
 mesh=Mesh("./examples/tutorials/Rijke_mm.msh",scale=0.001)
 case="Rijke_test"
 h=1E-9
@@ -33,7 +31,8 @@ else
     n_ref=[0.0; 0.0; 1.00] #directional unit vector of reference velocity
     n=1 #interaction index
     τ=0.001 #time delay
-    dscrp["Flame"]=(:flame,(γ,ρ,Q02U0,x_ref,n_ref,:n,:τ,n,τ)) #flame dynamics
+    ref_idx =  find_tetrahedron_containing_point(mesh,x_ref)
+    dscrp["Flame"]=(:flame,(γ,ρ,Q02U0,ref_idx,x_ref,n_ref,:n,:τ,n,τ)) #flame dynamics
     #dscrp["Flame"]=(:fancyflame,(γ,ρ,Q02U0,x_ref,n_ref,[:n1,:n2],[:τ1,:τ2],[:a1,:a2],[1.0,.5],[.001,0.0005],[.01,.01]))
     #unify!(mesh,"Flame2","Flame")
     #D["Flame"]=(:fancyflame,(γ,ρ,Q02U0,x_ref,n_ref,:n1,:τ1,:a1,1.0,.001,.01,),)
@@ -68,8 +67,8 @@ fd_sens=forward_finite_differences_shape_sensitivity(mesh,dscrp,c,surface_points
 
 
 
-## Postprocessinh
- normalize point sensitivity with directed surface triangle area
+## Postprocessing
+#normalize point sensitivity with directed surface triangle area
 normed_sens=normalize_sensitivity(surface_points,normal_vectors,tri_mask,sens)
 # boundary-mass-based-normalizations
 nsens = bound_mass_normalize(surface_points,normal_vectors,tri_mask,mesh,sens)
