@@ -45,6 +45,7 @@ end
 
 
 ## the following two functions should be eventually moved to meshutils once the revision of FEM is done.
+import ..Meshutils: get_line_idx, find_smplx, insert_smplx!
 function collect_triangles(mesh::Mesh)
     inner_triangles=[]
     for tet in mesh.tetrahedra
@@ -61,9 +62,6 @@ end
 ##
 
 ##
-
-
-import ..Meshutils: get_line_idx
 function aggregate_elements(mesh::Mesh, el_type=:1)
     N_points=size(mesh.points)[2]
     if (el_type in (:2,:h) ) &&  length(mesh.lines)==0

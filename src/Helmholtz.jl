@@ -48,7 +48,6 @@ Discretize the Helmholtz equation using the mesh `mesh`.
 - `L::LinearOperatorFamily`: parametereized discretization of the specified Helmholtz equation.
 - `rhs::LinearOperatorFamily`: parameterized discretization of the source vector. Only returned if `source==true`.  (experimental)
 """
-
 function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=true, source=false)
     triangles,tetrahedra,dim=aggregate_elements(mesh,order)
     N_points=size(mesh.points,2)
@@ -391,7 +390,7 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                     append!(S,mm[:])
                     append!(I,smplx[:])
                 end
-                if ref_idx!=0
+                if ref_idx==0
                     ref_idx=find_tetrahedron_containing_point(mesh,x_ref)
                 end
                 smplx=tetrahedra[ref_idx]

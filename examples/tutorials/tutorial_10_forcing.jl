@@ -20,7 +20,7 @@ dscrp["Flame"]=(:flame,(γ,ρ,Q02U0,x_ref,n_ref,:n,:τ,n,τ)) #flame dynamics
 R=287.05 # J/(kg*K) specific gas constant (air)
 speedofsound(x,y,z) = z<0. ? sqrt(γ*R*Tu) : sqrt(γ*R*Tb)
 c=generate_field(mesh,speedofsound)
-L,rhs=discretize(mesh,dscrp,c,source=true)
+L,rhs=discretize(mesh,dscrp,c,source=true,order=:h)
 
 rhs.params[:A]=1#E15*694/1im#694^2*1E15
 ## output
