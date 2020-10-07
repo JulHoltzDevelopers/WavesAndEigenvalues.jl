@@ -61,7 +61,18 @@ end
 
 ##
 
+#TODO: write function aggregate_elements(mesh, idx el_type=:1) for a single element
+# and integrate this as method to the Mesh type
 ##
+"""
+    triangles, tetrahedra, dim = aggregate_elements(mesh,el_type)
+
+Agregate lists (`triangles` and `tetrahedra`) of lists of indexed degrees of freedom
+for unstructured tetrahedral meshes. `dim` is the total number of DoF in the
+mesh featured by the requested element-type (`el_type`). Available element types
+are `:1` for first order elements (the default), `:2` for second order elements,
+and `:h` for  Hermitian elements.
+"""
 function aggregate_elements(mesh::Mesh, el_type=:1)
     N_points=size(mesh.points)[2]
     if (el_type in (:2,:h) ) &&  length(mesh.lines)==0
