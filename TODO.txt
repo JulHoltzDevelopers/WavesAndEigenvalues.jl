@@ -1,6 +1,6 @@
 Evaluation of Frequency response (Ale)
 
-	- "Loudspeaker" (prescribed velocity field on a boundary)
+	- "Loudspeaker" (prescribed velocity field on a boundary) I think georg did this
 	- Flame
 	- Resolvant analysis
 
