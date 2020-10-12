@@ -1,4 +1,4 @@
-import Pkg
+import Pkg #greetings to audrey
 Pkg.activate(".")
 Pkg.instantiate()
 cd("./examples/shape")
