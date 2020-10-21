@@ -214,20 +214,20 @@ sol,nn,flag=householder(L,250*2*pi,output=true);
 # so the solution is purely accoustic. The effect of the flame just enters the
 # problem via the speed of sound field (this is known as passive flame). By
 # setting the interaction index to `1.0` we activate the flame.
-L.params[:n]=1.0
+L.params[:n]=1
 # Now we can just solve the model again to get the active solutions
-sol_actv,nn,flag=householder(L,250*2*pi,output=true);
+sol_actv,nn,flag=householder(L,245*2*pi-82im*2*pi,output=true,order=3);
 # The eigenfrequency is now complex:
 sol_actv.params[:ω]/2/pi
 # with a growth rate `-imag(sol_actv.params[:ω]/2/pi)≈  59.22`
 
-# Instead of recomputing the eigenvalue by one of the solvers. We can also
+# Instead of recomputing the eigenvalue sol_acby one of the solvers. We can also
 # approximate the eigenvalue as a function of one of the model parameters
 # utilizing high-order perturbation theory. For instance this gives you
 # the 30th order diagonal Padé estimate expanded from the passive solution.
 
-perturb_fast!(sol,L,:n,2) #compute the coefficients
-freq(n)=sol(:n,n,15,15)/2/pi #create some function for convenience
+perturb_fast!(sol,L,:n,16) #compute the coefficients
+freq(n)=sol(:n,n,8,8)/2/pi #create some function for convenience
 freq(1) #evaluate the function at any value for `n` you are interested in.
 
 # The method is slow when only computing one eigenvalue. But its computational
