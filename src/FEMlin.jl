@@ -83,7 +83,7 @@ function assemble_boundary_mass_operator(points, tris, C)
   jj=Array{UInt32}(undef,3^2,length(tris))
   mm=Array{ComplexF64}(undef,3^2,length(tris))
   m_unit=[1/12 1/24 1/24;
-          1/24 1/12 1/12;
+          1/24 1/12 1/24;
           1/24 1/24 1/12]
 
   for (idx,(smplx,c)) in enumerate(zip(tris,C))

@@ -211,7 +211,11 @@ import Base.show
 function show(io::IO,L::LinearOperatorFamily)
   if !isempty(L.terms)
     shape=size(L.terms[1].coeff)
-    txt="$(shape[1])×$(shape[2]) dimensional operator family: \n\n"
+    if length(shape)==2
+      txt="$(shape[1])×$(shape[2])-dimensional operator family: \n\n"
+    else
+      txt="$(shape[1])-dimensional vector family: \n\n"
+    end
   else
     txt="empty operator family\n\n"
   end
@@ -243,6 +247,32 @@ end
 function show(io::IO,T::Term)
   print(io,string(T))
 end
+
+#make solution showable
+function string(sol::Solution)
+  txt="""####Solution####
+  eigval:
+  $(sol.eigval) = $(sol.params[sol.eigval])
+
+  Parameters:
+  """
+  for (key,val) in sol.params
+    if key !=  sol.eigval && key!=:λ
+      txt*="$key = $val\n"
+    end
+  end
+  #TODO: soft-code residual symbol name
+  txt*="""
+
+  Residual:
+  abs(λ) = $(abs(sol.params[:λ]))"""
+  return txt
+end
+function show(io::IO,sol::Solution)
+  print(io,string(sol))
+end
+
+
 #make terms callable
 function (term::Term)(dict::Dict{Symbol,Tuple{ComplexF64,Int64}})
   coeff::ComplexF64=1 #TODO parametrize type
