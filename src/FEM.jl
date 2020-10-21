@@ -45,6 +45,7 @@ end
 
 
 ## the following two functions should be eventually moved to meshutils once the revision of FEM is done.
+import ..Meshutils: get_line_idx, find_smplx, insert_smplx!
 function collect_triangles(mesh::Mesh)
     inner_triangles=[]
     for tet in mesh.tetrahedra
@@ -60,10 +61,18 @@ end
 
 ##
 
+#TODO: write function aggregate_elements(mesh, idx el_type=:1) for a single element
+# and integrate this as method to the Mesh type
 ##
+"""
+    triangles, tetrahedra, dim = aggregate_elements(mesh,el_type)
 
-
-import ..Meshutils: get_line_idx
+Agregate lists (`triangles` and `tetrahedra`) of lists of indexed degrees of freedom
+for unstructured tetrahedral meshes. `dim` is the total number of DoF in the
+mesh featured by the requested element-type (`el_type`). Available element types
+are `:1` for first order elements (the default), `:2` for second order elements,
+and `:h` for  Hermitian elements.
+"""
 function aggregate_elements(mesh::Mesh, el_type=:1)
     N_points=size(mesh.points)[2]
     if (el_type in (:2,:h) ) &&  length(mesh.lines)==0
@@ -2356,4 +2365,45 @@ end
 
 function s33vh(J::CooTrafo)
         return  recombine_hermite(J,[11/120  11/120  11/120  -1/60  1/120  1/120  1/120  -1/60  1/120  0 0 0 9/40])*abs(J.det)
+end
+
+function s33v1c1(J::CooTrafo,c)
+    c1,c2,c4=c
+    M=Array{ComplexF64}(undef,3)
+    M[1]=c1/12 + c2/24 + c4/24
+    M[2]=c1/24 + c2/12 + c4/24
+    M[3]=c1/24 + c2/24 + c4/12
+    return M*abs(J.det)
+end
+
+
+function s33v2c1(J::CooTrafo,c)
+    c1,c2,c4=c
+    M=Array{ComplexF64}(undef,6)
+    M[1]=c1/60 - c2/120 - c4/120
+    M[2]=-c1/120 + c2/60 - c4/120
+    M[3]=-c1/120 - c2/120 + c4/60
+    M[4]=c1/15 + c2/15 + c4/30
+    M[5]=c1/15 + c2/30 + c4/15
+    M[6]=c1/30 + c2/15 + c4/15
+    return M*abs(J.det)
+end
+
+function s33vhc1(J::CooTrafo,c)
+    c1,c2,c4=c
+    M=Array{ComplexF64}(undef,13)
+    M[1]=23*c1/360 + c2/72 + c4/72
+    M[2]=c1/72 + 23*c2/360 + c4/72
+    M[3]=c1/72 + c2/72 + 23*c4/360
+    M[4]=-c1/90 - c2/360 - c4/360
+    M[5]=c1/360 + c2/180
+    M[6]=c1/360 + c4/180
+    M[7]=c1/180 + c2/360
+    M[8]=-c1/360 - c2/90 - c4/360
+    M[9]=c2/360 + c4/180
+    M[10]=0
+    M[11]=0
+    M[12]=0
+    M[13]=3*c1/40 + 3*c2/40 + 3*c4/40
+    return recombine_hermite(J,M)*abs(J.det)
 end

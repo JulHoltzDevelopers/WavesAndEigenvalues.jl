@@ -1,4 +1,4 @@
-import Pkg
+import Pkg #greetings to audrey
 Pkg.activate(".")
 Pkg.instantiate()
 cd("./examples/shape")
@@ -70,8 +70,11 @@ dscrp["Interior"]=(:interior,())
 dscrp["Outlet"]=(:admittance, (:Y_out,1E15))
 #D["damper"]=(:admittance, (:Y,1E15))
 #D["Flame"]=(:flame,(γ,ρ,Q02U0,x_ref,n_ref,:n,:τ,1,.001))
+#D["Flame"]=(:fancyflame,(γ,ρ,Q02U0,x_ref,n_ref,[:n1,:n2],[:τ1,:τ2],[:a1,:a2],[1.0,.5],[.001,0.0005],[.01,.01]))
 
-
+#unify!(mesh,"Flame2","Flame")
+#D["Flame"]=(:fancyflame,(γ,ρ,Q02U0,x_ref,n_ref,:n1,:τ1,:a1,1.0,.001,.01,),)
+#D["Flame2"]=(:fancyflame,(γ,ρ,Q02U0,x_ref,n_ref,:n1,:τ1,:a1,.5,.0005,.01,),)
 L=discretize(mesh, dscrp, C, el_type=1, c_type=0)
 #L.params[:n]=1#compute_volume!(mesh,"Flame")/5000
 #L.params[:Y]=1E20

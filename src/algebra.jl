@@ -173,7 +173,7 @@ function exp_ax2(z,a,n)
   return f
 end
 
-function exp_ax2mxit(z,τ,a,m,n,k)
+function exp_az2mzit(z,τ,a,m,n,k)
   f=pow_a(n+2*k)
   g(z,l)=exp_ax2(z,a,l)
   h(z,l)=exp_delay(z,τ,l,0)
@@ -228,4 +228,19 @@ function generate_1_gz(g)
     end
   end
   return func
+end
+
+
+function Σnexp_az2mzit(args...)
+  J=(length(args)-2)÷6
+  f=0.0+0.0im
+  z=args[1] #argument is started by eigenfrequency...
+  m=args[J*3+1+1]
+  i=2:4
+  for j=0:J-1
+    nn,τ,a=args[i.+j*3] #... and continues with repeated sets of n, τ and a
+    l,n,k=args[i.+3*j.+3*J.+1]
+    f+=pow1(nn,l)*exp_az2mzit(z,τ,a,m,n,k)
+  end
+  return f
 end

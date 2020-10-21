@@ -31,7 +31,7 @@ function outer(ii,aa,jj,bb)
 end
 
 """
-    L=discretize(mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=true,source)
+    L=discretize(mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=true,source=false)
 
 Discretize the Helmholtz equation using the mesh `mesh`.
 
@@ -48,7 +48,6 @@ Discretize the Helmholtz equation using the mesh `mesh`.
 - `L::LinearOperatorFamily`: parametereized discretization of the specified Helmholtz equation.
 - `rhs::LinearOperatorFamily`: parameterized discretization of the source vector. Only returned if `source==true`.  (experimental)
 """
-
 function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=true, source=false)
     triangles,tetrahedra,dim=aggregate_elements(mesh,order)
     N_points=size(mesh.points,2)
@@ -70,6 +69,12 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
             push!(C_tri,C[tri[1:3]])
         end
     end
+
+
+    #initialize linear operator family...
+    L=LinearOperatorFamily(["ω","λ"],complex([0.,Inf]))
+    #...and source vector
+    rhs=LinearOperatorFamily(["ω"],complex([0.,]))
 
     if b!=:__none__
         bloch=true
@@ -182,59 +187,86 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
         end
     end
 
-    function wallsrc(J)
-        if order==:1
-            return s33v1(J)
-        elseif order==:2
-            return s33v2(J)
-        elseif order==:h
-            return s33vh(J)
+    function wallsrc(J,c)
+        if length(c)==1
+            if order==:1
+                return c*s33v1(J)
+            elseif order==:2
+                return c*s33v2(J)
+            elseif order==:h
+                return c*s33vh(J)
+            end
+        else
+            if order==:1
+                return s33v1c1(J,c)
+            elseif order==:2
+                return s33v2c1(J,c)
+            elseif order==:h
+                return s33vhc1(J,c)
+            end
         end
     end
 
-
-    #initialize linear operator family...
-    L=LinearOperatorFamily(["ω","λ"],complex([0.,Inf]))
-    #...and source vector
-    rhs=LinearOperatorFamily(["ω"],complex([0.,]))
 
 
     ## build discretization matrices and vectors from domain definitions
     for (domain,(type,data)) in dscrp
         if type==:interior
             make=[:M,:K]
-            matrix=true #sentinel value to toggle assembley of matrix (true) or vector (false)
 
-        elseif type==:admittance
-            make=[:C]
-            if length(data)==2
-                adm_sym,adm_val=data
-
-                adm_txt="ω*"*string(adm_sym)
-                if adm_sym ∉ keys(L.params)
-                    L.params[adm_sym]=adm_val
-                end
-                boundary_func=(pow1,pow1,)
-                boundary_arg=((:ω,),(adm_sym,),)
-                boundary_txt=adm_txt
-            elseif length(data)==1
-                boundary_func=(generate_z_g_z(data[1]),)
-                boundary_arg=((:ω,),)
-                boundary_txt="ω*Y(ω)"
-            elseif length(data)==4
-                Ass,Bss,Css,Dss = data
-                adm_txt="ω*C_s(iωI-A)^{-1}B"
-                func_z_stsp = generate_z_g_z(generate_stsp_z(Ass,Bss,Css,Dss))
-                boundary_func=(func_z_stsp,)
-                boundary_arg=((:ω,),)
-                boundary_txt=adm_txt
+        elseif type in (:admittance,:speaker)
+            make=[]
+            if type==:speaker
+                append!(make,[:m])
+                speak_sym,speak_val = data[1:2]
+                rhs.params[speak_sym]=speak_val
+                data = data[3:end]
             end
 
-            matrix=true
+
+            if length(data)>0
+                append!(make,[:C])
+                if length(data)==2
+                    adm_sym,adm_val=data
+
+                    adm_txt="ω*"*string(adm_sym)
+                    if adm_sym ∉ keys(L.params)
+                        L.params[adm_sym]=adm_val
+                        if type==:speaker
+                            rhs.params[adm_sym]=adm_val
+                        end
+                    end
+                    boundary_func=(pow1,pow1,)
+                    boundary_arg=((:ω,),(adm_sym,),)
+                    boundary_txt=adm_txt
+                elseif length(data)==1
+                    boundary_func=(generate_z_g_z(data[1]),)
+                    boundary_arg=((:ω,),)
+                    boundary_txt="ω*Y(ω)"
+                elseif length(data)==4
+                    Ass,Bss,Css,Dss = data
+                    adm_txt="ω*C_s(iωI-A)^{-1}B"
+                    func_z_stsp = generate_z_g_z(generate_stsp_z(Ass,Bss,Css,Dss))
+                    boundary_func=(func_z_stsp,)
+                    boundary_arg=((:ω,),)
+                    boundary_txt=adm_txt
+                end
+            end
+
+
 
         elseif type==:flame #TODO: unified interface with flameresponse and normalize n_ref
             make=[:Q]
-            gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val=data
+            if length(data)==9
+                gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val=data
+                ref_idx=0
+            elseif length(data)==10
+                gamma,rho,nglobal,ref_idx,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val=data
+            else
+             println("Erroro: Data length does not matc :flame option!")
+            end
+
+
             nlocal=(gamma-1)/rho*nglobal/compute_size!(mesh,domain)
             if n_sym ∉ keys(L.params)
                 L.params[n_sym]=n_val
@@ -246,11 +278,11 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
             flame_arg=((n_sym,),(:ω,tau_sym))
             flame_txt="$(string(n_sym))*exp(-iω$(string(tau_sym)))"
 
-            matrix=true
 
         elseif type==:flameresponse
             make=[:Q]
             gamma,rho,nglobal,x_ref,n_ref,eps_sym,eps_val=data
+            ref_idx=0
             nlocal=(gamma-1)/rho*nglobal/compute_size!(mesh,domain)
             if eps_sym ∉ keys(L.params)
                 L.params[eps_sym]=eps_val
@@ -259,31 +291,42 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
             flame_arg=((eps_sym,),)
             flame_txt="$(string(eps_sym))"
 
-            matrix=true
+
 
         elseif type==:fancyflame
             make=[:Q]
             gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym, a_sym, n_val, tau_val, a_val=data
+            ref_idx=0
             nlocal=(gamma-1)/rho*nglobal/compute_size!(mesh,domain)
-            if n_sym ∉ keys(L.params)
-                L.params[n_sym]=n_val
-            end
-            if tau_sym ∉ keys(L.params)
-                L.params[tau_sym]=tau_val
-            end
-            if a_sym ∉ keys(L.params)
-                L.params[a_sym]=a_val
-            end
 
-            flame_func=(pow1,exp_ax2mxit,)
-            flame_arg=((n_sym,),(:ω,tau_sym,a_sym,))
-            flame_txt="$(string(n_sym))* exp($(string(a_sym))ω^2-iω$(string(tau_sym)))"
-            matrix=true
+            if typeof(n_val)<:Number #TODO: sanity check that other lists are same length
+                if n_sym ∉ keys(L.params)
+                    L.params[n_sym]=n_val
+                end
+                if tau_sym ∉ keys(L.params)
+                    L.params[tau_sym]=tau_val
+                end
+                if a_sym ∉ keys(L.params)
+                    L.params[a_sym]=a_val
+                end
 
-        elseif type==:loudspeaker
-            make=[:m]
-            loud_sym,loud_val=data
-            matrix=false
+                flame_func=(pow1,exp_az2mzit,)
+                flame_arg=((n_sym,),(:ω,tau_sym,a_sym,))
+                flame_txt="$(string(n_sym))* exp($(string(a_sym))ω^2-iω$(string(tau_sym)))"
+            else
+                flame_arg=(:ω,)
+                flame_txt=""
+                for (ns, ts, as, nv, tv, av) in zip(n_sym, tau_sym, a_sym, n_val, tau_val,a_val)
+                    L.params[ns]=nv
+                    L.params[ts]=tv
+                    L.params[as]=av
+                    flame_arg=(flame_arg...,ns,ts,as,)
+                    flame_txt*="[$(string(ns))* exp($(string(as))ω^2-iω$(string(ts)))+"
+                end
+                flame_txt=flame_txt[1:end-1]*"]"
+                flame_arg=(flame_arg,)
+                flame_func=(Σnexp_az2mzit,)
+            end
 
         else
             make=[]
@@ -294,6 +337,7 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
             I=UInt32[] #TODO: consider preallocation
             J=UInt32[]
             if opr==:M
+                matrix=true #sentinel value to toggle assembley of matrix (true) or vector (false)
                 for smplx in tetrahedra[mesh.domains[domain]["simplices"]]
                     CT=CooTrafo(mesh.points[:,smplx[1:4]])
                     ii,jj=create_indices(smplx)
@@ -307,6 +351,7 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                 txt="ω^2"
                 mat="M"
             elseif opr==:K
+                matrix=true
                 for (smplx,c) in zip(tetrahedra[mesh.domains[domain]["simplices"]],C_tet[mesh.domains[domain]["simplices"]])
                     CT=CooTrafo(mesh.points[:,smplx[1:4]])
                     ii,jj=create_indices(smplx)
@@ -321,6 +366,7 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                 #V=-V
                 mat="K"
             elseif opr==:C
+                matrix=true
                 for (smplx,c) in zip(triangles[mesh.domains[domain]["simplices"]],C_tri[mesh.domains[domain]["simplices"]])
                     CT=CooTrafo(mesh.points[:,smplx[1:3]])
                     ii,jj=create_indices(smplx)
@@ -335,6 +381,7 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                 txt=boundary_txt  # txt=adm_txt
                 mat="C"
             elseif opr==:Q
+                matrix=true
                 S=ComplexF64[]
                 G=ComplexF64[]
                 for smplx in tetrahedra[mesh.domains[domain]["simplices"]]
@@ -343,7 +390,9 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                     append!(S,mm[:])
                     append!(I,smplx[:])
                 end
-                ref_idx=find_tetrahedron_containing_point(mesh,x_ref)
+                if ref_idx==0
+                    ref_idx=find_tetrahedron_containing_point(mesh,x_ref)
+                end
                 smplx=tetrahedra[ref_idx]
                 CT=CooTrafo(mesh.points[:,smplx[1:4]])
                 mm=gradsrc(CT,n_ref,x_ref)
@@ -356,6 +405,7 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                 txt=flame_txt
                 mat="Q"
             elseif opr==:m
+                matrix=false
                 for (smplx,c) in zip(triangles[mesh.domains[domain]["simplices"]],C_tri[mesh.domains[domain]["simplices"]])
                     CT=CooTrafo(mesh.points[:,smplx[1:3]])
                     ii=smplx[:]
@@ -363,8 +413,9 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                     append!(V,vv[:])
                     append!(I,ii[:])
                 end
-                func=(pow1,pow1,)
-                arg=((:ω,),(loud_sym,),)
+                V./=1im
+                func=(boundary_func...,pow1,)
+                arg=(boundary_arg...,(speak_sym,),)
                 txt="speaker"
                 mat="m"
             end
@@ -416,14 +467,14 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
         if 0<naxis #modify axis dof for essential boundary condition when blochwave number !=0
             DI=1:naxis
             DV=ones(ComplexF64,naxis) #TODO: make this more compact
-            if el_type==2
+            if order==:2
                 DI=vcat(DI,(N_points+1:naxis_ln).-nxbloch)
                 DV=vcat(DV,ones(ComplexF64,naxis_ln-N_points))
             end
             for idx=1:naxis
                 DV[idx]=1/M[idx,idx]
             end
-            if el_type==2
+            if order==:2
                 for (idx,ii) in enumerate((N_points+1:naxis_ln).-nxbloch)
                     DV[idx+naxis]=1/M[ii,ii]
                 end

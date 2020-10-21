@@ -1,11 +1,13 @@
-#Simple tube example.
+#shape example.
+import Pkg
+Pkg.activate(".")
 using WavesAndEigenvalues.Helmholtz
 
-##
-mesh=Mesh("Rijke_mm.msh",scale=0.001)
+## configure set-up
+mesh=Mesh("./examples/tutorials/Rijke_mm.msh",scale=0.001)
 case="Rijke_test"
-h=1E-13
-#mesh=octosplit(mesh);case*="_fine"  #activate this line to refine the mesh
+h=1E-9
+mesh=octosplit(mesh);case*="_fine"  #activate this line to refine the mesh
 
 dscrp=Dict()
 dscrp["Interior"]=(:interior,())
@@ -27,14 +29,19 @@ else
     Q02U0=P0*(Tb/Tu-1)*A*γ/(γ-1) #the ratio of mean heat release to mean velocity Q02U0
     x_ref=[0.0; 0.0; -0.00101] #reference point
     n_ref=[0.0; 0.0; 1.00] #directional unit vector of reference velocity
-    n=0.01 #interaction index
+    n=1 #interaction index
     τ=0.001 #time delay
-    dscrp["Flame"]=(:flame,(γ,ρ,Q02U0,x_ref,n_ref,:n,:τ,n,τ)) #flame dynamics
+    ref_idx =  find_tetrahedron_containing_point(mesh,x_ref)
+    dscrp["Flame"]=(:flame,(γ,ρ,Q02U0,ref_idx,x_ref,n_ref,:n,:τ,n,τ)) #flame dynamics
+    #dscrp["Flame"]=(:fancyflame,(γ,ρ,Q02U0,x_ref,n_ref,[:n1,:n2],[:τ1,:τ2],[:a1,:a2],[1.0,.5],[.001,0.0005],[.01,.01]))
+    #unify!(mesh,"Flame2","Flame")
+    #D["Flame"]=(:fancyflame,(γ,ρ,Q02U0,x_ref,n_ref,:n1,:τ1,:a1,1.0,.001,.01,),)
+    #D["Flame2"]=(:fancyflame,(γ,ρ,Q02U0,x_ref,n_ref,:n1,:τ1,:a1,.5,.0005,.01,),)
     R=287.05 # J/(kg*K) specific gas constant (air)
     speedofsound(x,y,z) = z<0. ? sqrt(γ*R*Tu) : sqrt(γ*R*Tb)
     c=generate_field(mesh,speedofsound)
     case*="_hot"
-    init=170.0
+    init=700.0
 end
 
 
@@ -49,14 +56,19 @@ sol, n, flag = householder(L,init*2*pi,maxiter=14, tol=1E-11,output = true, n_ei
 
 
 
-##
+## prepare shape
 # identify surface points
 surface_points, tri_mask, tet_mask =get_surface_points(mesh)
 # compute normal vectors on surface triangles
 normal_vectors=get_normal_vectors(mesh)
 ## DA approach
 sens=discrete_adjoint_shape_sensitivity(mesh,dscrp,c,surface_points,tri_mask,tet_mask,L,sol,h=h)
-# normalize point sensitivity with directed surface triangle area
+fd_sens=forward_finite_differences_shape_sensitivity(mesh,dscrp,c,surface_points,tri_mask,tet_mask,L,sol,h=h)
+
+
+
+## Postprocessing
+#normalize point sensitivity with directed surface triangle area
 normed_sens=normalize_sensitivity(surface_points,normal_vectors,tri_mask,sens)
 # boundary-mass-based-normalizations
 nsens = bound_mass_normalize(surface_points,normal_vectors,tri_mask,mesh,sens)
@@ -102,7 +114,7 @@ data["imag nDA z"*mode]=imag.(nsens[3,:])
 #data["diff DA -- FD"*mode]=abs.((sens.-sens_FD))
 vtk_write(case, mesh, data)
 ## FD approach
-fd_sens=forward_finite_differences_shape_sensitivity(mesh,dscrp,c,surface_points,tri_mask,tet_mask,L,sol,h=h)
+#fd_sens=forward_finite_differences_shape_sensitivity(mesh,dscrp,c,surface_points,tri_mask,tet_mask,L,sol,h=h)
 ## write output
 mode="[$(string(round((sol.params[:ω]/2/pi),digits=2)))]Hz"
 data=Dict()

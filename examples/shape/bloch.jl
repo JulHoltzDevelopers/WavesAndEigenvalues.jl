@@ -34,8 +34,8 @@ dscrp["Interior"]=(:interior,())
 dscrp["Outlet_high"]=(:admittance, (:Y_in,1E15))
 dscrp["Outlet_low"]=(:admittance, (:Y_out,1E15))
 ##discretize models
-L=discretize(full_mesh, dscrp, C, el_type=1, c_type=0)
-l=discretize(unit_mesh, dscrp, c, el_type=1, c_type=0,b=:b)
+L=discretize(full_mesh, dscrp, C, order=:1)
+l=discretize(unit_mesh, dscrp, c, order=:1,b=:b)
 ## solve model using beyn
 #(type Γ by typing \Gamma and Enter)
 Γ=[150.0+5.0im, 150.0-5.0im, 1000.0-5.0im, 1000.0+5.0im].*2*pi #corner points for the contour (in this case a rectangle)
@@ -43,7 +43,7 @@ l=discretize(unit_mesh, dscrp, c, el_type=1, c_type=0,b=:b)
 l.params[:b]=1
 #ω, p = beyn(l,Γ,l=10,N=4*128, output=true)
 ##
-sol, n, flag = householder(l,904*2*pi,maxiter=14, tol=1E-10,output = true, n_eig_val=3)
+sol, n, flag = householder(l,914*2*pi,maxiter=16, tol=0*1E-10,output = true, n_eig_val=3)
 
 
 
@@ -54,6 +54,7 @@ surface_points, tri_mask, tet_mask =get_surface_points(unit_mesh)
 # compute normal vectors on surface triangles
 normal_vectors=get_normal_vectors(unit_mesh)
 ## DA approach
+blochify_surface_points!(unit_mesh, surface_points, tri_mask, tet_mask)
 sens=discrete_adjoint_shape_sensitivity(unit_mesh,dscrp,c,surface_points,tri_mask,tet_mask,l,sol)
 ##
 # normalize point sensitivity with directed surface triangle area
@@ -63,8 +64,8 @@ nsens = bound_mass_normalize(surface_points,normal_vectors,tri_mask,unit_mesh,se
 # compute sensitivity in unit normal direction
 normal_sens = normal_sensitivity(normal_vectors, normed_sens)
 
-## correct sens for bloch formalis
-sens[:,unit_mesh.dos.naxis+1:unit_mesh.dos.naxis+unit_mesh.dos.nxbloch].+=sens[:,end-unit_mesh.dos.nxbloch+1:end]
+## correct sens for bloch formalism
+#sens[:,unit_mesh.dos.naxis+1:unit_mesh.dos.naxis+unit_mesh.dos.nxbloch].+=sens[:,end-unit_mesh.dos.nxbloch+1:end]
 sens[:,end-unit_mesh.dos.nxbloch+1:end]=sens[:,unit_mesh.dos.naxis+1:unit_mesh.dos.naxis+unit_mesh.dos.nxbloch]
 ## save data
 DD=Dict()
@@ -107,13 +108,13 @@ data["phase_p"*mode]=angle.(v)
 vtk_write(case*"_modes", full_mesh, data)
 
 ## FD approach
-blochify_surface_points!(unit_mesh, surface_points, tri_mask, tet_mask)
+
 fd_sens=forward_finite_differences_shape_sensitivity(unit_mesh,dscrp,c,surface_points,tri_mask,tet_mask,l,sol)
 fd_sens[:,end-unit_mesh.dos.nxbloch+1:end]=fd_sens[:,unit_mesh.dos.naxis+1:unit_mesh.dos.naxis+unit_mesh.dos.nxbloch]
 
 
 ## write output
-mode="[$(string(round((sol.params[:ω]/2/pi),digits=2)))]Hz"
+[]mode="[$(string(round((sol.params[:ω]/2/pi),digits=2)))]Hz"
 data=Dict()
 data["abs_p"*mode]=abs.(sol.v)./maximum(abs.(sol.v))
 data["phase_p"*mode]=angle.(sol.v)
@@ -129,3 +130,5 @@ data["imag DA z"*mode]=imag.(fd_sens[3,:])
 #data["central finite difference"]=real.(sens_CFD)
 #data["diff DA -- FD"*mode]=abs.((sens.-sens_FD))
 vtk_write(case*"_fd", unit_mesh, data)
+##
+findmax(abs.(sens-fd_sens))
