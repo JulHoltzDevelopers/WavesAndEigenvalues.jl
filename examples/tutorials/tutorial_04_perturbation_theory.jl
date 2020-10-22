@@ -111,7 +111,7 @@ println(" 30th-order approx=$(ω_approx/2/pi)")
 # package from julias package manager.
 
 
-#TODO: Padé, speed, conv_radius
+#TODO:speed
 
 ## #jl
 # Ok, we've seen how we can compute Taylor-series coefficients and how to
@@ -161,7 +161,7 @@ println(" exact=$(ω_exact/2/pi)  vs  approx=$(ω_approx/2/pi))")
 # But this time...
 ω_approx=sol(:τ,τ+r[end]+0.001,30)
 println(" exact=$(ω_exact/2/pi)  vs  approx=$(ω_approx/2/pi))")
-# things get *way' worse! This is exaclty the reason why some clever person
+# things get *way* worse! This is exaclty the reason why some clever person
 # named r the radius of *convergence*. Beyond that radius we cannot make the
 # Taylor-series converge without shifting the expansion point. You might think:
 # 'Well, then let's shift the expansion point!' While this is definitely a valid
