@@ -257,27 +257,42 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
 
         elseif type==:flame #TODO: unified interface with flameresponse and normalize n_ref
             make=[:Q]
-            if length(data)==9
+            isntau=false
+            isFTF=false
+            if length(data)==9 ## ref_idx is not specified by the user
                 gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val=data
                 ref_idx=0
-            elseif length(data)==10
+                isntau=true
+            elseif length(data)==10## ref_idx is specified by the user
                 gamma,rho,nglobal,ref_idx,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val=data
+                isntau=true
+            elseif length(data)==6 #custom FTF
+                gamma,rho,nglobal,x_ref,n_ref,FTF=data
+                ref_idx=0
+                isFTF=true
             else
-             println("Erroro: Data length does not matc :flame option!")
+             println("Error: Data length does not match :flame option!")
             end
 
 
             nlocal=(gamma-1)/rho*nglobal/compute_size!(mesh,domain)
-            if n_sym ∉ keys(L.params)
-                L.params[n_sym]=n_val
+            if isntau
+                if n_sym ∉ keys(L.params)
+                    L.params[n_sym]=n_val
+                end
+                if tau_sym ∉ keys(L.params)
+                    L.params[tau_sym]=tau_val
+                end
+                flame_func=(pow1,exp_delay,)
+                flame_arg=((n_sym,),(:ω,tau_sym))
+                flame_txt="$(string(n_sym))*exp(-iω$(string(tau_sym)))"
             end
-            if tau_sym ∉ keys(L.params)
-                L.params[tau_sym]=tau_val
-            end
-            flame_func=(pow1,exp_delay,)
-            flame_arg=((n_sym,),(:ω,tau_sym))
-            flame_txt="$(string(n_sym))*exp(-iω$(string(tau_sym)))"
 
+            if isFTF
+                flame_func = (FTF,)
+                flame_arg = ((:ω,),)
+                flame_txt = "FTF(ω)"
+            end
 
         elseif type==:flameresponse
             make=[:Q]
