@@ -101,3 +101,4 @@ tri2tet=zeros(UInt32,length(triangles))
 tri2tet[1]=0xffffffff
 
 mesh=Mesh("mesh.vtu",Points,[],triangles,tetrahedra,domains,"mesh.vtu",tri2tet,1)
+vtk_write("eth_diff", mesh, data_diff)

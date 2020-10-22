@@ -179,10 +179,10 @@ println(" exact=$(ω_exact/2/pi)  vs  approx=$(ω_approx/2/pi))")
 # f(x0+Δ)≈[ ∑_l=0^L a_l(x0)Δ^l ] / [ 1 + ∑_m=0^M b_m(x0)Δ^m ]
 # In order to get the same asymptotic behaviour close to our expansion point, we
 # demand that the truncated Taylor series expansion of our Padé approximant is
-# identical to the approximation of our unknown function. Here comes the clou
+# identical to the approximation of our unknown function. Here comes the clou:
 # we already know these values because we computed the Taylor-series
 # coefficients. Only little algebra is needed to convert the Taylor coefficients
-# to Padé coefficients and all of this is build in to solution type. All you
+# to Padé coefficients and all of this is build in to the solution type. All you
 # need to know is that the number of Padé coefficients is related to the number
 # of Taylor coefficients by the simple formula L+M=N. Let's give it a try and
 # compute the Padé approximant for L=M=10 (a so-called diagonal Padé
