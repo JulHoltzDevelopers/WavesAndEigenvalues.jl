@@ -5,7 +5,7 @@
 # The solver is a generalization of Lancasters *Generalised Rayleigh Quotient
 # iteration* [1], in the sense that it enables not only Newton's method for root
 # finding, but also up to fith-order Householder iterations. The implementation
-# closely follows the consideration in [2].
+# closely follows the considerations in [2].
 #
 # [1] P. Lancaster, A Generalised Rayleigh Quotient Iteration for Lambda-Matrices,Arch. Rational Mech Anal., 1961, 8, p.
 # 309-322, https://doi.org/10.1007/BF00277446
@@ -59,7 +59,7 @@ sol,nn,flag = householder(L, z)
 ## #jl
 # ## Maximum iterations
 #
-# As per default five iteration are performed. This iteration number can be
+# As per default five iterations are performed. This iteration number can be
 # customized using the keyword `maxiter` For instance the following command
 # runs 30 iterations
 sol,nn,flag = householder(L, z, maxiter=30)
@@ -84,7 +84,7 @@ sol,nn,flag = householder(L, z, maxiter=30, tol=1E-10)
 # ## Determining convergence
 #
 # Technically, the iteration may stop because of slow progress in the iteration
-# rather than actual convergence. A simple indicator for actual convergnce is
+# rather than actual convergence. A simple indicator for actual convergence is
 # the auxiliary eigenvalue `λ`. The closer it is to `0` the better is the
 # quality of the computed solution. To help the identification of falsely
 # terminated iterations you can specify another tolerance `lam_tol`. If
