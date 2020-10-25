@@ -38,7 +38,7 @@ R=287.05 # J/(kg*K) specific gas constant (air)
 speedofsound(x,y,z) = z<0. ? sqrt(γ*R*Tu) : sqrt(γ*R*Tb)
 c=generate_field(mesh,speedofsound)
 # btw this is the moment where we specify the values of n and τ
-n=0.01 #interaction index
+n=1 #interaction index
 τ=0.001 #time delay
 
 ##
@@ -79,4 +79,19 @@ sol,nn,flag=householder(L,340*2*pi,maxiter=20,tol=1E-11)
 # something very custom as FTF. Maybe a superposition of σ-τ-models or even
 # a statespace model fitted to experimental data.
 
-#TODO: implicit FTF modelling, vectorfit
+##TODO: , vectorfit
+#implicit FTF modelling as in Silva et al ASME2020
+dscrp["Flame"]=(:flame,(γ,ρ,Q02U0,x_ref,n_ref)) #no flame dynamics specified at all
+H=discretize(mesh,dscrp,c)
+sol_base,nn,flag=householder(H,340*2*pi,maxiter=20,tol=1E-11)
+perturb_fast!(sol_base,H,:FTF,30)
+## Newton-Raphson for finding flame response
+ω0=sol_base.params[:ω]
+ω(f,k=0)=sol(:FTF,f,15,15)
+
+n=1.0
+η0=0
+for i=1:40
+    Δη=η0-(FTF(ω(η0))-η0)/FTF(ω(η0,1))
+    println(Δη)
+end
