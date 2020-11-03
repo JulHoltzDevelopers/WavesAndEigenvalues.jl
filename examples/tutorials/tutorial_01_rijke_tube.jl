@@ -31,7 +31,7 @@
 # In case of an active flame (q̂≠0). We will also need
 #
 # 4. some additional gas porperties and
-# 5. and a flame response model linking the heat release fluctuations q̂ to the pressure fluctuations p̂
+# 5. a flame response model linking the heat release fluctuations q̂ to the pressure fluctuations p̂
 #
 # Once you completed this tutorial you will know the basic steps of how to
 # conduct a thermo-acoustic stability analysis
@@ -94,7 +94,7 @@ dscrp["Interior"]=(:interior, ())
 # To represent this on a computer we just give it a crazily high value like
 # `1E15`. We will also need to specify a variable name for our admmittance value.
 # This will allow to quickly change the value after discretization of the
-# model by addressing by this very name. This feature is one of the core
+# model by addressing it by this very name. This feature is one of the core
 # concepts of the solver. As will be demonstrated later.
 #
 # The complete description of our boundary condition reads
@@ -179,7 +179,7 @@ print(L)
 # The found eigenvalues are stored in the array `Ω`. The corresponding
 # eigenvectors are the columns of `P`.
 # The huge advantage of the global eigenvalue solver is that it finds you
-# multiple eigenvalues. However, its accuracy may be low and sometimes it
+# multiple eigenvalues. Nonetheless, its accuracy may be low and sometimes it
 # provides you with outright wrong solutions.
 # However, for the current case the method works as we can varify that in our
 # search window there are two eigenmodes oscilating at 272 and 695 Hz
@@ -221,7 +221,7 @@ sol_actv,nn,flag=householder(L,245*2*pi-82im*2*pi,output=true,order=3);
 sol_actv.params[:ω]/2/pi
 # with a growth rate `-imag(sol_actv.params[:ω]/2/pi)≈  59.22`
 
-# Instead of recomputing the eigenvalue sol_acby one of the solvers. We can also
+# Instead of recomputing the eigenvalue by one of the solvers. We can also
 # approximate the eigenvalue as a function of one of the model parameters
 # utilizing high-order perturbation theory. For instance this gives you
 # the 30th order diagonal Padé estimate expanded from the passive solution.

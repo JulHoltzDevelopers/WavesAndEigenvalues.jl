@@ -74,7 +74,7 @@ sol,nn,flag=householder(L,340*2*pi,maxiter=20,tol=1E-11)
 # iterating it in a for-loop or from within a function, due to julia's scoping
 # rules.
 
-## Something else then n-τ...
+## Something else than n-τ...
 # Of course this is an academic example. In practice you will specify
 # something very custom as FTF. Maybe a superposition of σ-τ-models or even
 # a statespace model fitted to experimental data.
