@@ -13,7 +13,7 @@ dscrp=Dict()
 dscrp["Interior"]=(:interior,())
 dscrp["Outlet"]=(:admittance, (:Y,1E15))
 hot=false
-hot=true
+hot=trueb#activate this line for the active solution
 if !hot
     c=ones(length(mesh.tetrahedra))*347.0
     case*="_cold"
