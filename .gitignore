@@ -1,3 +1,5 @@
 **/.DS_Store
 src/compressed_perturbation_data
-*.vtu
+deps/build.log
+**.vtu
+**.mesh

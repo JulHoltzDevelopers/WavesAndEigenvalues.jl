@@ -1,6 +1,6 @@
 name = "WavesAndEigenvalues"
 uuid = "a73532ca-c7c2-4c65-85c3-8d67803e4c1d"
-authors = ["Georg A. Mensah <gmensah@ethz.ch>", "Alessandro Orchini"]
+authors = ["Georg A. Mensah <gmensah@ethz.ch>", "Alessandro Orchini <a.orchini@tu-berlin.de>"]
 version = "0.1.1"
 
 [deps]
