@@ -1,10 +1,8 @@
 ## import Helmholtz-solver library
 using WavesAndEigenvalues.Helmholtz
 ## load mesh from file
-mesh=Mesh("../NTNU/NTNU.msh",scale=1.0)
+mesh=Mesh("NTNU.msh",scale=1.0)
 #create unit and full mesh from half-cell
-# Important: full merges all the domains that are copied from the unit cell
-# unit: keeps the domains separate and appends numbers!
 doms=[("Interior",:full),("Inlet",:full), ("Outlet_high",:full), ("Outlet_low",:full), ("Flame",:unit),]#
 collect_lines!(mesh)
 unit_mesh=extend_mesh(mesh,doms,unit=true)
@@ -20,6 +18,7 @@ function speedofsound(x,y,z)
     end
 end
 
+
 c=generate_field(unit_mesh,speedofsound,0)
 C=generate_field(full_mesh,speedofsound,0)
 #D=Dict()
@@ -32,7 +31,7 @@ D["Outlet_high"]=(:admittance, (:Y_in,1E15))
 D["Outlet_low"]=(:admittance, (:Y_out,1E15))
 ##discretize models
 L=discretize(full_mesh, D, C, order=:1,)
-l=discretize(unit_mesh, D, c, order=:1, b=:b)
+l=discretize(unit_mesh, D, c, order=:1,b=:b)
 ## solve model using beyn
 #(type Γ by typing \Gamma and Enter)
 Γ=[150.0+5.0im, 150.0-5.0im, 1000.0-5.0im, 1000.0+5.0im].*2*pi #corner points for the contour (in this case a rectangle)
