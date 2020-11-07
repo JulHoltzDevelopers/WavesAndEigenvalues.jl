@@ -203,7 +203,7 @@ function generate_multi_indices_at_order(k;to_disk=false,compressed=false)
     if to_disk
       fname="$(key[1])_$(key[2])"
       println("fname: $fname")
-      open(pack*dir*fname,"a") do file
+      open(pack*dir*fname,"w") do file
         write(file,mult2str(out))
       end
     else

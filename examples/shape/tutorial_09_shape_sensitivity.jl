@@ -13,7 +13,7 @@ dscrp=Dict()
 dscrp["Interior"]=(:interior,())
 dscrp["Outlet"]=(:admittance, (:Y,1E15))
 hot=false
-hot=true
+hot=true#activate this line for the active solution
 if !hot
     c=ones(length(mesh.tetrahedra))*347.0
     case*="_cold"
@@ -132,3 +132,4 @@ data["imag DA z"*mode]=imag.(fd_sens[3,:])
 #data["central finite difference"]=real.(sens_CFD)
 #data["diff DA -- FD"*mode]=abs.((sens.-sens_FD))
 vtk_write(case*"_fd", mesh, data)
+println("Done writing!")

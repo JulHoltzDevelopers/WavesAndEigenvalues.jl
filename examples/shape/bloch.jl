@@ -1,13 +1,19 @@
 #import WavesAndEigenvalues.Meshutils: create_rotation_matrix_around_axis, get_rotated_index, get_reflected_index
 using WavesAndEigenvalues.Helmholtz
 ## load mesh from file
-case="NTNU"
-mesh=Mesh("NTNU_12.msh",scale=1.0)
+case="NTNU_new"
+mesh=Mesh("../NTNU/NTNU.msh",scale=1.0)
+mesh=octosplit(mesh)
 #create unit and full mesh from half-cell
-doms=[("Interior",:full),("Inlet",:full), ("Outlet_high",:full), ("Outlet_low",:full), ("Walls",:full),("Flame",:unit),]#
+#doms=[("Interior",:full),("Inlet",:full), ("Outlet_high",:full), ("Outlet_low",:full), ("Walls",:full),("Flame",:unit),("Bloch",:unit)]#
+doms=[("Interior",:full),("Inlet",:full), ("Outlet_high",:full), ("Outlet_low",:full), ("Flame",:unit),]#
+
 collect_lines!(mesh)
 unit_mesh=extend_mesh(mesh,doms,unit=true)
 full_mesh=extend_mesh(mesh,doms,unit=false)
+D=Dict()
+D["mesh"]=zeros(Float64,6044)
+vtk_write(case*"_mesh",unit_mesh,D)
 ## meshing
 #naxis=unit_mesh.dos.naxis
 #nxbloch=unit_mesh.dos.nxbloch
@@ -34,7 +40,7 @@ dscrp["Interior"]=(:interior,())
 dscrp["Outlet_high"]=(:admittance, (:Y_in,1E15))
 dscrp["Outlet_low"]=(:admittance, (:Y_out,1E15))
 ##discretize models
-L=discretize(full_mesh, dscrp, C, order=:1)
+#L=discretize(full_mesh, dscrp, C, order=:1)
 l=discretize(unit_mesh, dscrp, c, order=:1,b=:b)
 ## solve model using beyn
 #(type Γ by typing \Gamma and Enter)
@@ -56,6 +62,12 @@ normal_vectors=get_normal_vectors(unit_mesh)
 ## DA approach
 blochify_surface_points!(unit_mesh, surface_points, tri_mask, tet_mask)
 sens=discrete_adjoint_shape_sensitivity(unit_mesh,dscrp,c,surface_points,tri_mask,tet_mask,l,sol)
+
+## correct sens for bloch formalism
+#sens[:,unit_mesh.dos.naxis+1:unit_mesh.dos.naxis+unit_mesh.dos.nxbloch].+=sens[:,end-unit_mesh.dos.nxbloch+1:end]
+sens[:,end-unit_mesh.dos.nxbloch+1:end]=sens[:,unit_mesh.dos.naxis+1:unit_mesh.dos.naxis+unit_mesh.dos.nxbloch]
+
+
 ##
 # normalize point sensitivity with directed surface triangle area
 normed_sens=normalize_sensitivity(surface_points,normal_vectors,tri_mask,sens)
@@ -64,9 +76,7 @@ nsens = bound_mass_normalize(surface_points,normal_vectors,tri_mask,unit_mesh,se
 # compute sensitivity in unit normal direction
 normal_sens = normal_sensitivity(normal_vectors, normed_sens)
 
-## correct sens for bloch formalism
-#sens[:,unit_mesh.dos.naxis+1:unit_mesh.dos.naxis+unit_mesh.dos.nxbloch].+=sens[:,end-unit_mesh.dos.nxbloch+1:end]
-sens[:,end-unit_mesh.dos.nxbloch+1:end]=sens[:,unit_mesh.dos.naxis+1:unit_mesh.dos.naxis+unit_mesh.dos.nxbloch]
+
 ## save data
 DD=Dict()
 DD["real normed_sens1"]=real.(normed_sens[1,:])
@@ -114,7 +124,7 @@ fd_sens[:,end-unit_mesh.dos.nxbloch+1:end]=fd_sens[:,unit_mesh.dos.naxis+1:unit_
 
 
 ## write output
-[]mode="[$(string(round((sol.params[:ω]/2/pi),digits=2)))]Hz"
+mode="[$(string(round((sol.params[:ω]/2/pi),digits=2)))]Hz"
 data=Dict()
 data["abs_p"*mode]=abs.(sol.v)./maximum(abs.(sol.v))
 data["phase_p"*mode]=angle.(sol.v)
