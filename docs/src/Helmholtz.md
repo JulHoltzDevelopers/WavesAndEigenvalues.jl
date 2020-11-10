@@ -1,12 +1,6 @@
 # Helmholtz
-```@autodocs
-Modules = [WavesAndEigenvalues.Helmholtz]
-```
-## Discretization Order
-```@autodocs
-Modules = [
-  WavesAndEigenvalues.Helmholtz.lin,
-  WavesAndEigenvalues.Helmholtz.quad,
-  WavesAndEigenvalues.Helmholtz.quad20,
-]
+```@docs
+WavesAndEigenvalues.Helmholtz
+WavesAndEigenvalues.Helmholtz.discretize
+WavesAndEigenvalues.Helmholtz.bloch_expand
 ```

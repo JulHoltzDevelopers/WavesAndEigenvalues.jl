@@ -37,7 +37,7 @@ Discretize the Helmholtz equation using the mesh `mesh`.
 
 # Arguments
 - `mesh::Mesh`: tetrahedral mesh
-- `dscrp::Dict `: dictionary containing information on where to apply physical constraints. Such as standard wave propagation, boundary conditions, flame responses, etc.
+- `dscrp::Dict `: dictionary containing information on the equations to be solved. Thgese include standard wave propagation, boundary conditions, flame responses. See below for more info
 - `C:Array`: array defining the speed of sound. If `length(C)==length(mesh.tetrahedra)` the speed of sound is constant along one tetrahedron. If `length(C)==size(mesh.points,2)` the speed of sound is linearly interpolated between the vertices of the mesh.
 - `order::Symbol = :1`: optional paramater to select between first (`order==:1` the default), second (`order==:2`),or hermitian-order (`order==:h`) finite elements.
 - `b::Symbol=:__none__`: optional parameter defining the Bloch wave number. If `b=:__none__` (the default) no Blochwave formalism is applied.
@@ -47,6 +47,33 @@ Discretize the Helmholtz equation using the mesh `mesh`.
 # Returns
 - `L::LinearOperatorFamily`: parametereized discretization of the specified Helmholtz equation.
 - `rhs::LinearOperatorFamily`: parameterized discretization of the source vector. Only returned if `source==true`.  (experimental)
+
+## Accepted values for `dscrp` dictionary
+Currently supported entries for describing the physics of the problem are
+### Volume equations
+- `dscrp["volumeDomain"] = (:interior,())`: discretizes the mass and stiffnes matrices of the helmholtz equation on the specified "volumeDomain".
+- `dscrp["volumeDomain"] = (:flame,(gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val))`: discretizes the flame matrix non-homogeneous TA helmholtz equation using an `n-τ` model on the specified "volumeDomain". The needed inputs are:
+    - `gamma`: heat capacity ratio
+    - `rho`:   density
+    - `nglobal`: total heat release over velocity, Q/U
+    - `x_ref`: reference position for velocity feedback
+    - `n_ref`: gradient of velocity feedback
+    - `n_sym`: symbol to be used for `n`
+    - `tau_sym`: symbol to be used for `τ`
+    - `n_val`: default value for `n`
+    - `tau_val`: default value for `τ`
+- `dscrp["volumeDomain"] = (:flame,(gamma,rho,nglobal,x_ref,n_ref,FTF))`: discretizes the flame matrix non-homogeneous TA helmholtz equation using a frequency-dependent user-defined `FTF(ω)` model on the specified "volumeDomain". The needed inputs are:
+    - The defined FTF function should be defined in `algebra.jl`, and contain routines to calculate its derivatives w.r.t. ω.
+### Boundary equation
+- `dscrp["boundaryDomain"] = (:admittance,(:Symbol, value))`: discretizes the boundary matrix with constant admittance `value` on the specified "boundaryDomain"
+- `dscrp["boundaryDomain"] = (:admittance,(Y(ω)),)`: discretizes the boundary matrix with a frequency-dependent admittance specified by the function `Y(ω)` on the specified "boundaryDomain"
+    - The defined function for the admittance should be defined in `algebra.jl`, and contain routines to calculate its derivatives w.r.t. ω.
+- `dscrp["boundaryDomain"] = (:admittance,(A,B,C,D)`: discretizes the boundary matrix with a state-space model admittance specified by the function `C_s(iωI-A)^{-1}B` on the specified "boundaryDomain"
+
+### Available but undocumented equations
+- speaker: simulate the response to a forced speaker
+- flameresponse: simulate the response to the one-way flame coupling with the acoustics
+- other soecific flame models (plain FTF, fancy flame)
 """
 function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=true, source=false)
     triangles,tetrahedra,dim=aggregate_elements(mesh,order)
@@ -214,6 +241,8 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
         if type==:interior
             make=[:M,:K]
 
+
+        # TODO: Georg, please provide a description of the inputs needed by speaker in the discretize docstring
         elseif type in (:admittance,:speaker)
             make=[]
             if type==:speaker

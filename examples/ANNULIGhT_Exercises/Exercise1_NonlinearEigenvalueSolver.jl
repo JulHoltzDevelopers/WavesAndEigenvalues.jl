@@ -1,4 +1,4 @@
-# # Exercise 1: Nonlinear Eigenvalue Solver(s)
+# # Exercise 1: Nonlinear Eigenvalue Solver
 #
 # This exercise aims at introdcing the package *WavesAndEigenvalues* applied to the
 # identification of thermoacoustic instabilities. You will learn how to import and use a mesh,
@@ -14,14 +14,14 @@
 #
 # The conventioned used to map frequency and time domains is $f'(t) --> f̂(ω)exp(+iωt)$.
 # http://www.youtube.com/watch?v=g0NXlnsfqt0&t=43m6s
-
+#
 # Here $c$ is the speed-of-sound field, $p̂$ the (complex) pressure fluctuation modeshape,
 # $ω$ the (complex) frequency of the problem, $i$ the imaginary unit, $γ$ the ratio of
 # specifc heats, and $q̂$ the (frequency dependent) heat release fluctuation response.
 #
 # Together with some boundary conditions the Helmholtz equation models
 # thermoacoustic instability in a cavity. The minimum required inputs to specify
-# a problem are
+# the problem are
 #
 # For the acoustics:
 # 1. the 3D shape of the domain;
@@ -36,11 +36,20 @@
 #
 # ## Finite Element discretization of the Helmholtz equation
 #
-#We shall consider a straight duct of length $L = 0.5$~m and radius $r=0.025$~m, filled with air.  The gas properties upstream of the flame are $\gamma=1.4$, $\rho=1.17$, and $p_0=101325$, and $T_u=300$. We will set the boundary conditions to be closed (upstream) and opened (downstream). For this simple system, you may know and/or be able to calculate the acoustic eigenvalues analytically. This fundamental frequency is $f_1 = c/4L$. We will benchmark the FE solver results with these known values.
+# To start, we shall consider a straight duct of length $L = 0.5$~m and radius $r=0.025$~m,
+# filled with air.  The gas properties upstream of the flame are $\gamma=1.4$, $\rho=1.17$,
+# and $p_0=101325$, and $T_u=300$. We will set the boundary conditions to be closed (upstream)
+# and opened (downstream). For this simple system, you may know and/or be able to calculate the
+# acoustic eigenvalues analytically. This fundamental frequency is $f_1 = c/4L$. We will benchmark
+# the FE solver results with these known values.
 #
-#To solve this problem with WavesAndEigenvalues you need a mesh, the equations, a discretization scheme, and an eigenvalue solver. The mesh, called "Rijke{\textunderscore}mm.msh" is  is given to you. All the rest is pre-coded for you in WavesAndEigenvalues, you only need to define the problem.
+# To solve this problem with WavesAndEigenvalues you need a mesh, the equations, a discretization scheme, and an eigenvalue solver. The mesh, called "Rijke{\textunderscore}mm.msh" is  is given to you. All the rest is pre-coded for you in WavesAndEigenvalues, you only need to define the problem.
 #
-#To learn how to load a mesh, define the equations to be solved, and build a discretization matrix, use the documentation of the package.
+# To learn how to load a mesh, define the equations to be solved, and build a discretization matrix, use the documentation of the package.
+#
+#
+# ### The Helmholtz equation
+using WavesAndEigenvalues.Helmholtz
 #
 # To define the problem, we need to specify what equations are to be solved in each
 # part of the domain. In a finite element formulation, these are expressed in terms of
@@ -57,7 +66,6 @@
 # First you will need to load the Helmholtz solver. The following line brings all
 # necessary tools into scope:
 #
-using WavesAndEigenvalues.Helmholtz
 #
 #
 # A Rijke tube is the most simple thermo-acoustic configuration. It comprises a
@@ -66,7 +74,7 @@ using WavesAndEigenvalues.Helmholtz
 # Helmholtz-solver stability analysis.
 
 
-# ### The Helmholtz equation
+
 
 ## #jl
 # ## Mesh
@@ -240,7 +248,7 @@ sol,nn,flag=householder(L,250*2*pi,output=true);
 # setting the interaction index to `1.0` we activate the flame.
 L.params[:n]=1
 # Now we can just solve the model again to get the active solutions
-sol_actv,nn,flag=householder(L,245*2*pi-82im*2*pi,output=true,order=3);
+sol_actv,nn,flag=householder(L,245*2*pi-82im*2*pi,output=true,order=1);
 # The eigenfrequency is now complex:
 sol_actv.params[:ω]/2/pi
 # with a growth rate `-imag(sol_actv.params[:ω]/2/pi)≈  59.22`

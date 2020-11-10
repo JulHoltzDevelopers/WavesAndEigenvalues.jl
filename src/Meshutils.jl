@@ -850,7 +850,7 @@ function get_surface_points(mesh::Mesh,output::Bool=true)
             end
         end
     end
-    
+
     return surface_points, tri_mask, tet_mask
 end
 # function get_surface_points(mesh::Mesh,output::Bool=true)
@@ -955,10 +955,10 @@ end
 """
     generate_field(mesh::Mesh,func,el_type=0)
 
-Generate field from function `func`for mesh `mesh`. The element type is either
+Generate a field by applying the function `func` onto the mesh `mesh`. The element type is either
 `el_type=0` for field values associated with the mesh tetrahedra or `el_type=1`
-for field values associated with the mesh vertices. The function must accept
-three input arguments corresponding to the three space dimensions.
+for field values associated with the mesh vertices. The function `func` must accept
+exactly three input numerical arguments, corresponding to the three space dimensions.
 """
 function generate_field(mesh::Mesh,func,el_type=0)
     #TODO: implement el_type=2

@@ -19,7 +19,20 @@ function Term(coeff,func::Tuple,params::Tuple,symbol::String,operator::String)
   unique!(varlist)
   return Term(coeff,func,symbol,params,operator, varlist)
 end
+"""
+Stores the solution(s) returned by the nonlinear eigenvalue solvers.
 
+# Stored Data
+- `eigval`: symbol that represents the eigenvalue
+- `eigval_pert`: Dictionary containing eigenvalue perturbation corrections
+- `params`: Dictionary containing the list of parameters at which the eigenvalue was identified
+- `v`: direct eigenvector
+- `v_adj`: adjoint eigenvector
+- `v_pert`: Dictionary containing eigenvector perturbation correction
+
+# Methods
+- `Solution(:Symbol, val, n)`: Estimates the eigenvalue using perturbation theory at order `n`th order perturbation theory when the parameter `:Symbol` takes value `val`
+"""
 mutable struct Solution #ToDo: make immutable and parametrized type
   params
   v
@@ -29,6 +42,7 @@ mutable struct Solution #ToDo: make immutable and parametrized type
   v_pert
 end
 #constructor
+
 function Solution(params,v,v_adj,eigval)
   return Solution(deepcopy(params),v,v_adj,eigval,Dict{Symbol,Any}(),Dict{Symbol,Any}()) #TODO: copy params?
 end
