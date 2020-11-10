@@ -19,7 +19,20 @@ function Term(coeff,func::Tuple,params::Tuple,symbol::String,operator::String)
   unique!(varlist)
   return Term(coeff,func,symbol,params,operator, varlist)
 end
+"""
+Stores the solution(s) returned by the nonlinear eigenvalue solvers.
 
+# Stored Data
+- `eigval`: symbol that represents the eigenvalue
+- `eigval_pert`: Dictionary containing eigenvalue perturbation corrections
+- `params`: Dictionary containing the list of parameters at which the eigenvalue was identified
+- `v`: direct eigenvector
+- `v_adj`: adjoint eigenvector
+- `v_pert`: Dictionary containing eigenvector perturbation correction
+
+# Methods
+- `Solution(:Symbol, val, n)`: Estimates the eigenvalue using perturbation theory at order `n`th order perturbation theory when the parameter `:Symbol` takes value `val`
+"""
 mutable struct Solution #ToDo: make immutable and parametrized type
   params
   v
@@ -29,6 +42,7 @@ mutable struct Solution #ToDo: make immutable and parametrized type
   v_pert
 end
 #constructor
+
 function Solution(params,v,v_adj,eigval)
   return Solution(deepcopy(params),v,v_adj,eigval,Dict{Symbol,Any}(),Dict{Symbol,Any}()) #TODO: copy params?
 end
@@ -211,7 +225,11 @@ import Base.show
 function show(io::IO,L::LinearOperatorFamily)
   if !isempty(L.terms)
     shape=size(L.terms[1].coeff)
-    txt="$(shape[1])×$(shape[2]) dimensional operator family: \n\n"
+    if length(shape)==2
+      txt="$(shape[1])×$(shape[2])-dimensional operator family: \n\n"
+    else
+      txt="$(shape[1])-dimensional vector family: \n\n"
+    end
   else
     txt="empty operator family\n\n"
   end
@@ -243,6 +261,32 @@ end
 function show(io::IO,T::Term)
   print(io,string(T))
 end
+
+#make solution showable
+function string(sol::Solution)
+  txt="""####Solution####
+  eigval:
+  $(sol.eigval) = $(sol.params[sol.eigval])
+
+  Parameters:
+  """
+  for (key,val) in sol.params
+    if key !=  sol.eigval && key!=:λ
+      txt*="$key = $val\n"
+    end
+  end
+  #TODO: soft-code residual symbol name
+  txt*="""
+
+  Residual:
+  abs(λ) = $(abs(sol.params[:λ]))"""
+  return txt
+end
+function show(io::IO,sol::Solution)
+  print(io,string(sol))
+end
+
+
 #make terms callable
 function (term::Term)(dict::Dict{Symbol,Tuple{ComplexF64,Int64}})
   coeff::ComplexF64=1 #TODO parametrize type
