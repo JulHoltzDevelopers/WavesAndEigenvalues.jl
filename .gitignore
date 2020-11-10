@@ -3,4 +3,7 @@ src/compressed_perturbation_data
 deps/build.log
 **.vtu
 **.mesh
+<<<<<<< HEAD
 **.sh
+=======
+>>>>>>> f06cb95f65fd8f7049fa3172d24ed610bdfa3228

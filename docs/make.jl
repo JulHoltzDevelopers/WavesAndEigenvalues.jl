@@ -20,9 +20,6 @@ makedocs(
      ],
      "Examples" => Any[
      "load_mesh.md",
-     "tutorial_01_rijke_tube.md",
-     "tutorial_02_gloabal_eigenvalue_solver.md",
-     "tutorial_03_local_eigenvalue_solver.md",
      ],
  ],
 )

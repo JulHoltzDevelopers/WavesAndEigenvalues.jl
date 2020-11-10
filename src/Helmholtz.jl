@@ -37,7 +37,7 @@ Discretize the Helmholtz equation using the mesh `mesh`.
 
 # Arguments
 - `mesh::Mesh`: tetrahedral mesh
-- `dscrp::Dict `: dictionary containing information on where to apply physical constraints. Such as standard wave propagation, boundary conditions, flame responses, etc.
+- `dscrp::Dict `: dictionary containing information on the equations to be solved. Thgese include standard wave propagation, boundary conditions, flame responses. See below for more info
 - `C:Array`: array defining the speed of sound. If `length(C)==length(mesh.tetrahedra)` the speed of sound is constant along one tetrahedron. If `length(C)==size(mesh.points,2)` the speed of sound is linearly interpolated between the vertices of the mesh.
 - `order::Symbol = :1`: optional paramater to select between first (`order==:1` the default), second (`order==:2`),or hermitian-order (`order==:h`) finite elements.
 - `b::Symbol=:__none__`: optional parameter defining the Bloch wave number. If `b=:__none__` (the default) no Blochwave formalism is applied.
@@ -47,6 +47,33 @@ Discretize the Helmholtz equation using the mesh `mesh`.
 # Returns
 - `L::LinearOperatorFamily`: parametereized discretization of the specified Helmholtz equation.
 - `rhs::LinearOperatorFamily`: parameterized discretization of the source vector. Only returned if `source==true`.  (experimental)
+
+## Accepted values for `dscrp` dictionary
+Currently supported entries for describing the physics of the problem are
+### Volume equations
+- `dscrp["volumeDomain"] = (:interior,())`: discretizes the mass and stiffnes matrices of the helmholtz equation on the specified "volumeDomain".
+- `dscrp["volumeDomain"] = (:flame,(gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val))`: discretizes the flame matrix non-homogeneous TA helmholtz equation using an `n-τ` model on the specified "volumeDomain". The needed inputs are:
+    - `gamma`: heat capacity ratio
+    - `rho`:   density
+    - `nglobal`: total heat release over velocity, Q/U
+    - `x_ref`: reference position for velocity feedback
+    - `n_ref`: gradient of velocity feedback
+    - `n_sym`: symbol to be used for `n`
+    - `tau_sym`: symbol to be used for `τ`
+    - `n_val`: default value for `n`
+    - `tau_val`: default value for `τ`
+- `dscrp["volumeDomain"] = (:flame,(gamma,rho,nglobal,x_ref,n_ref,FTF))`: discretizes the flame matrix non-homogeneous TA helmholtz equation using a frequency-dependent user-defined `FTF(ω)` model on the specified "volumeDomain". The needed inputs are:
+    - The defined FTF function should be defined in `algebra.jl`, and contain routines to calculate its derivatives w.r.t. ω.
+### Boundary equation
+- `dscrp["boundaryDomain"] = (:admittance,(:Symbol, value))`: discretizes the boundary matrix with constant admittance `value` on the specified "boundaryDomain"
+- `dscrp["boundaryDomain"] = (:admittance,(Y(ω)),)`: discretizes the boundary matrix with a frequency-dependent admittance specified by the function `Y(ω)` on the specified "boundaryDomain"
+    - The defined function for the admittance should be defined in `algebra.jl`, and contain routines to calculate its derivatives w.r.t. ω.
+- `dscrp["boundaryDomain"] = (:admittance,(A,B,C,D)`: discretizes the boundary matrix with a state-space model admittance specified by the function `C_s(iωI-A)^{-1}B` on the specified "boundaryDomain"
+
+### Available but undocumented equations
+- speaker: simulate the response to a forced speaker
+- flameresponse: simulate the response to the one-way flame coupling with the acoustics
+- other soecific flame models (plain FTF, fancy flame)
 """
 function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=true, source=false)
     triangles,tetrahedra,dim=aggregate_elements(mesh,order)
@@ -214,6 +241,8 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
         if type==:interior
             make=[:M,:K]
 
+
+        # TODO: Georg, please provide a description of the inputs needed by speaker in the discretize docstring
         elseif type in (:admittance,:speaker)
             make=[]
             if type==:speaker
@@ -257,27 +286,52 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
 
         elseif type==:flame #TODO: unified interface with flameresponse and normalize n_ref
             make=[:Q]
-            if length(data)==9
+            isntau=false
+            if length(data)==9 ## ref_idx is not specified by the user
                 gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val=data
                 ref_idx=0
-            elseif length(data)==10
+                isntau=true
+            elseif length(data)==10## ref_idx is specified by the user
                 gamma,rho,nglobal,ref_idx,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val=data
+                isntau=true
+            elseif length(data)==6 #custom FTF
+                gamma,rho,nglobal,x_ref,n_ref,FTF=data
+                ref_idx=0
+                flame_func = (FTF,)
+                flame_arg = ((:ω,),)
+                flame_txt = "FTF(ω)"
+            elseif length(data)==5 #plain FTF
+                gamma,rho,nglobal,x_ref,n_ref=data
+                ref_idx=0
+                L.params[:FTF]=0.0
+                flame_func = (pow1,)
+                flame_arg = ((:FTF,),)
+                flame_txt = "FTF"
+                gamma,rho,nglobal,x_ref,n_ref=data
             else
-             println("Erroro: Data length does not matc :flame option!")
+             println("Error: Data length does not match :flame option!")
             end
 
 
             nlocal=(gamma-1)/rho*nglobal/compute_size!(mesh,domain)
-            if n_sym ∉ keys(L.params)
-                L.params[n_sym]=n_val
+            if isntau
+                if n_sym ∉ keys(L.params)
+                    L.params[n_sym]=n_val
+                end
+                if tau_sym ∉ keys(L.params)
+                    L.params[tau_sym]=tau_val
+                end
+                flame_func=(pow1,exp_delay,)
+                flame_arg=((n_sym,),(:ω,tau_sym))
+                flame_txt="$(string(n_sym))*exp(-iω$(string(tau_sym)))"
             end
-            if tau_sym ∉ keys(L.params)
-                L.params[tau_sym]=tau_val
-            end
-            flame_func=(pow1,exp_delay,)
-            flame_arg=((n_sym,),(:ω,tau_sym))
-            flame_txt="$(string(n_sym))*exp(-iω$(string(tau_sym)))"
 
+            if ref_idx==0
+                ref_idx=find_tetrahedron_containing_point(mesh,x_ref)
+            end
+            if ref_idx ∈ mesh.domains[domain]["simplices"]
+                println("Warning: your reference point is inside the domain of heat release. (short-circuited FTF!)")
+            end
 
         elseif type==:flameresponse
             make=[:Q]
@@ -290,6 +344,9 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
             flame_func=(pow1,)
             flame_arg=((eps_sym,),)
             flame_txt="$(string(eps_sym))"
+            if ref_idx==0
+                ref_idx=find_tetrahedron_containing_point(mesh,x_ref)
+            end
 
 
 
@@ -326,6 +383,9 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                 flame_txt=flame_txt[1:end-1]*"]"
                 flame_arg=(flame_arg,)
                 flame_func=(Σnexp_az2mzit,)
+            end
+            if ref_idx==0
+                ref_idx=find_tetrahedron_containing_point(mesh,x_ref)
             end
 
         else
@@ -389,9 +449,6 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                     mm=volsrc(CT)
                     append!(S,mm[:])
                     append!(I,smplx[:])
-                end
-                if ref_idx==0
-                    ref_idx=find_tetrahedron_containing_point(mesh,x_ref)
                 end
                 smplx=tetrahedra[ref_idx]
                 CT=CooTrafo(mesh.points[:,smplx[1:4]])
