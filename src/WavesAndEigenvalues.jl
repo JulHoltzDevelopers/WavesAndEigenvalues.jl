@@ -3,6 +3,8 @@ module WavesAndEigenvalues
 include("Meshutils.jl")
 include("NLEVP.jl")
 include("Helmholtz.jl")
+include("APE.jl")
+include("network.jl")
 
 
 #using .Meshutils

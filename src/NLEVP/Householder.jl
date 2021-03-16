@@ -1,4 +1,4 @@
-import Arpack,LinearAlgebra
+import Arpack,LinearAlgebra#, NLsolve
 #TODO: Degeneracy
 # function householder_update(f,a=1)
 #     order=length(f)-1
@@ -44,10 +44,11 @@ Use a Householder method to iteratively find an eigenpar of `L`, starting the th
 - `maxiter::Integer=10`: Maximum number of iterations.
 - `tol=0`: Absolute tolerance to trigger the stopping of the iteration. If the difference of two consecutive iterates is `abs(z0-z1)<tol` the iteration is aborted.
 - `relax=1`: relaxation parameter
-- `lam_tol=0.`: tolerance for the auxiliary eigenvalue to test convergence
+- `lam_tol=Inf`: tolerance for the auxiliary eigenvalue to test convergence. The default is infinity, so there is effectively no test.
 - `order::Integer=1`: Order of the Householder method, Maximum is 5
-- `n_eig_val::Integer=1`: Number of Eigenvalues to be searched for in intermediate ARPACK calls.
+- `nev::Integer=1`: Number of Eigenvalues to be searched for in intermediate ARPACK calls.
 - `v0::Vector`: Initial vector for Krylov subspace generation in ARPACK calls. If not provided the vector is initialized with ones.
+- `v0_adj::Vector`: Initial vector for Krylov subspace generation in ARPACK calls. If not provided the vector is initialized with `v0`.
 - `output::Bool`: Toggle printing online information.
 
 # Returns
@@ -66,7 +67,7 @@ Thus, with a higher order less iterations will be necessary. However, the comput
 
 See also: [`beyn`](@ref)
 """
-function householder(L,z;maxiter=10,tol=0.,relax=1.,lam_tol=0.,order=1,n_eig_val=1,v0=[],output=true)
+function householder(L,z;maxiter=10,tol=0.,relax=1.,lam_tol=Inf,order=1,nev=1,v0=[],v0_adj=[],output=true)
     if output
         println("Launching Householder...")
         println("Iter    Res:     dz:     z:")
@@ -76,27 +77,28 @@ function householder(L,z;maxiter=10,tol=0.,relax=1.,lam_tol=0.,order=1,n_eig_val
     lam=float(Inf)
 
     n=0
-    active=L.active #TODO: better integrate activity into householder
-    mode=L.mode #TODO: same for mode
+    active=L.active #IDEA: better integrate activity into householder
+    mode=L.mode #IDEA: same for mode
     if v0==[]
         v0=ones(ComplexF64,size(L(0))[1])
-        v0_adj=ones(ComplexF64,size(L(0))[1])
-    else
-        #TODO: Inititialize adjoint
-        v0_adj=v0
+    end
+    if v0_adj==[]
+        v0_adj=conj.(v0)#ones(ComplexF64,size(L(0))[1])
     end
 
+
+
     flag=1
+    M=-L.terms[end].coeff
     try
-        while abs(z-z0)>tol && n<maxiter #TODO: include lam_tol here to avoid slow convergenvce terminations
+        while  abs(z-z0)>tol   && n<maxiter #&& abs(lam)>lam_tol
             if output; println(n,"\t\t",abs(lam),"\t",abs(z-z0),"\t", z );flush(stdout); end
             z0=z
             L.params[L.eigval]=z
             L.params[L.auxval]=0
             A=L(z)
-            M=-L.terms[end].coeff
-            lam,v = Arpack.eigs(A,M,nev=n_eig_val, sigma = 0,v0=v0)
-            lam_adj,v_adj = Arpack.eigs(A',M', nev=n_eig_val, sigma = 0,v0=v0_adj)
+            lam,v = Arpack.eigs(A,M,nev=nev, sigma = 0,v0=v0)
+            lam_adj,v_adj = Arpack.eigs(A',M', nev=nev, sigma = 0,v0=v0_adj)
             #TODO: consider constdouton
             #TODO: multiple eigenvalues
             indexing=sortperm(lam, by=abs)
@@ -105,11 +107,9 @@ function householder(L,z;maxiter=10,tol=0.,relax=1.,lam_tol=0.,order=1,n_eig_val
             indexing=sortperm(lam_adj, by=abs)
             lam_adj=lam_adj[indexing]
             v_adj=v_adj[:,indexing]
-
-            #TODO: sort v_adj
             delta_z =[]
             L.active=[L.auxval,L.eigval]
-            for i in 1:n_eig_val
+            for i in 1:nev
                 L.params[L.auxval]=lam[i]
                 sol=Solution(L.params,v[:,i],v_adj[:,i],L.auxval)
                 perturb!(sol,L,L.eigval,order,mode=:householder)
@@ -123,11 +123,9 @@ function householder(L,z;maxiter=10,tol=0.,relax=1.,lam_tol=0.,order=1,n_eig_val
             lam=lam[indexing[1]]
             L.params[L.auxval]=lam #TODO remove this from the loop body
             z=z+relax*delta_z[indexing[1]]
-            #print('here ',( v0.T  + (v[:,indexing[0]])   ).shape)
             v0=(1-relax)*v0+relax*v[:,indexing[1]]
             v0_adj=(1-relax)*v0_adj+relax*v_adj[:,indexing[1]]
             n+=1
-            #gc.collect()
         end
 
     catch excp
@@ -187,5 +185,171 @@ function householder(L,z;maxiter=10,tol=0.,relax=1.,lam_tol=0.,order=1,n_eig_val
     end
     L.active=active
     L.mode=mode
+    #normalization
+    v0/=sqrt(v0'*M*v0)
+    v0_adj/=conj(v0_adj'*L(L.params[L.eigval],1)*v0)
+    return Solution(L.params,v0,v0_adj,L.eigval), n, flag
+end
+
+##PAde solver
+function poly_roots(p)
+  N=length(p)-1
+  C=zeros(ComplexF64,N,N)
+  for i=2:N
+    C[i,i-1]=1
+  end
+  C[:,N].=-p[1:N]./p[N+1]
+  return LinearAlgebra.eigvals(C)
+end
+
+function padesolve(L,z;maxiter=10,tol=0.,relax=1.,lam_tol=Inf,order=1,nev=1,v0=[],v0_adj=[],output=true,num_order=1)
+    if output
+        println("Launching Pade solver...")
+        println("Iter    Res:     dz:     z:")
+        println("----------------------------------")
+    end
+    z0=complex(Inf)
+    lam=float(Inf)
+    lam0=float(Inf)
+
+    n=0
+    active=L.active #IDEA: better integrate activity into householder
+    mode=L.mode #IDEA: same for mode
+    if v0==[]
+        v0=ones(ComplexF64,size(L(0))[1])
+    end
+    if v0_adj==[]
+        v0_adj=conj.(v0)#ones(ComplexF64,size(L(0))[1])
+    end
+
+    flag=1
+    M=-L.terms[end].coeff
+    try
+        while  abs(z-z0)>tol   && n<maxiter #&& abs(lam)>lam_tol
+            if output; println(n,"\t\t",abs(lam),"\t",abs(z-z0),"\t", z );flush(stdout); end
+
+            L.params[L.eigval]=z
+            L.params[L.auxval]=0
+            A=L(z)
+            lam,v = Arpack.eigs(A,M,nev=nev, sigma = 0,v0=v0)
+            lam_adj,v_adj = Arpack.eigs(A',M', nev=nev, sigma = 0,v0=v0_adj)
+            #TODO: consider constdouton
+            #TODO: multiple eigenvalues
+            indexing=sortperm(lam, by=abs)
+            lam=lam[indexing]
+            v=v[:,indexing]
+            indexing=sortperm(lam_adj, by=abs)
+            lam_adj=lam_adj[indexing]
+            v_adj=v_adj[:,indexing]
+            delta_z =[]
+            back_delta_z=[]
+            L.active=[L.auxval,L.eigval]
+            #println("#############")
+            #println("lam0:$lam0 ")
+            for i in 1:nev
+                L.params[L.auxval]=lam[i]
+                sol=Solution(L.params,v[:,i],v_adj[:,i],L.auxval)
+                perturb!(sol,L,L.eigval,order,mode=:householder)
+                coeffs=sol.eigval_pert[Symbol("$(L.eigval)/Taylor")]
+                num,den=pade(coeffs,num_order,order-num_order)
+
+                #forward calculation (has issues with multi-valuedness)
+                roots=poly_roots(num)
+                indexing=sortperm(roots, by=abs)
+                dz=roots[indexing[1]]
+                push!(delta_z,dz)
+                #poles=sort(poly_roots(den),by=abs)
+                #poles=poles[1]
+                #println(">>>$i<<<")
+                #println("$coeffs")
+                #println("residue:$(LinearAlgebra.norm((A-lam[i]*M)*v[:,i])) and $(LinearAlgebra.norm((A'-lam_adj[i]*M')*v_adj[:,i]))")
+                #println("poles: $(poles+z) r:$(abs(poles))")
+                #backward check(for solving multi-valuedness problems by continuity)
+                if z0!=Inf
+                    back_lam=polyval(num,z0-z)/polyval(den,z0-z)
+                    #println("back:$back_lam")
+                    #println("root: $(z+dz)")
+                    #estm_lam=polyval(num,dz)/polyval(den,dz)
+                    #println("estm. lam: $estm_lam")
+                    back_lam=lam0-back_lam
+                    push!(back_delta_z,back_lam)
+                end
+            end
+            L.active=[L.eigval]
+            if z0!=Inf
+                indexing=sortperm(back_delta_z, by=abs)
+            else
+                indexing=sortperm(delta_z, by=abs)
+            end
+            lam=lam[indexing[1]]
+            L.params[L.auxval]=lam #TODO remove this from the loop body
+            z0=z
+            lam0=lam
+            z=z+relax*delta_z[indexing[1]]
+            v0=(1-relax)*v0+relax*v[:,indexing[1]]
+            v0_adj=(1-relax)*v0_adj+relax*v_adj[:,indexing[1]]
+            n+=1
+        end
+
+    catch excp
+        if output
+            println("Error occured:")
+            println(excp)
+            println(typeof(excp))
+            println("...aborted Householder!")
+        end
+
+        flag=-2
+        if typeof(excp) <: Arpack.ARPACKException
+           flag=-4
+           if excp==Arpack.ARPACKException(-9999)
+               flag=-9999
+           end
+       elseif excp== LinearAlgebra.SingularException(0) #This means that the solution is so good that L(z) cannot be LU factorized...TODO: implement other strategy into perturb
+           flag=-6
+           L.params[L.eigval]=z
+        end
+    end
+    if flag==1
+        L.params[L.eigval]=z
+        if output;  println(n,"\t\t",abs(lam),"\t",abs(z-z0),"\t", z ); end
+
+
+        if n>=maxiter
+            flag=-1
+            if output; println("Warning: Maximum number of iterations has been reached!");end
+
+        elseif abs(lam)<=lam_tol
+            flag=1
+            if output; println("Solution has converged!"); end
+        elseif abs(z-z0)<=tol
+            flag=0
+            if output; println("Warning: Slow convergence!"); end
+        elseif isnan(z)
+            flag=-5
+            if output; println("Warning: computer arithmetics problem. Eigenvalue is NaN"); end
+        else
+            if output; println("Warning: This should not be possible....\n If you can read this contact GAM!");end
+            flag=-3
+            println(z)
+        end
+
+        if output
+            println("...finished Householder!")
+            println("#####################")
+            println(" Householder results ")
+            println("#####################")
+            println("Number of steps: ",n)
+            println("Last step parameter variation:",abs(z0-z))
+            println("Auxiliary eigenvalue λ residual (rhs):", abs(lam))
+            println("Eigenvalue:",z)
+            println("Eigenvalue/(2*pi):",z/2/pi)
+        end
+    end
+    L.active=active
+    L.mode=mode
+    #normalization
+    v0/=sqrt(v0'*M*v0)
+    v0_adj/=conj(v0_adj'*L(L.params[L.eigval],1)*v0)
     return Solution(L.params,v0,v0_adj,L.eigval), n, flag
 end

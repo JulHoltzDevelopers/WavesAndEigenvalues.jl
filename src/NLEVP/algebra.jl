@@ -11,6 +11,8 @@ function pow0(z::ComplexF64,k::Int=0)::ComplexF64
   end
 end
 
+pow0(z::Symbol)=""
+
 function pow1(z::ComplexF64,k::Int=0)::ComplexF64
   if k==0
     return z
@@ -22,6 +24,8 @@ function pow1(z::ComplexF64,k::Int=0)::ComplexF64
     return complex(NaN)#force NaN if a negative derivative is requested
   end
 end
+
+pow1(z::Symbol)="$z"
 
 function pow2(z::ComplexF64,k::Int=0)::ComplexF64
   if k==0
@@ -36,10 +40,11 @@ function pow2(z::ComplexF64,k::Int=0)::ComplexF64
     return complex(NaN) #force NaN if a negative derivative is requested
   end
 end
+pow2(z::Symbol)="$z^2"
 
 #TODO turn this into a macro
 function pow(z::ComplexF64,k::Int64,a::Int64)::ComplexF64
-  if k>a
+  if k>a>0
     f= 0
   elseif k>=0
     f=1
@@ -56,10 +61,66 @@ function pow(z::ComplexF64,k::Int64,a::Int64)::ComplexF64
 end
 
 function pow_a(a::Int64)
-  return (z::ComplexF64,k::Int64=0)-> pow(z,k,a)
+
+  function f(z::ComplexF64,k::Int64=0)::ComplexF64
+    let a=a
+      return pow(z,k,a)
+    end#let
+  end
+  #This code fails incremental compilation.
+  #TODO: check why
+  # if a==0
+  #   f(z::Symbol)=""
+  # elseif a==1
+  #   f(z::Symbol)="$z"
+  # else
+  #   f(z::Symbol)="$z^$a"
+  # end
+  function f(z::Symbol)
+    let a=a
+      if a==0
+        return ""
+      elseif a==1
+        return "$z"
+      else
+        return
+        "$z^$a"
+      end
+    end
+  end
+  return f
 end
 
-function exp_delay(ω,τ,m,n)
+
+function generate_exp_az(a)
+  function f(z::ComplexF64,k::Int)::ComplexF64
+    let a=a
+      if k>=0
+        return a^k*exp(a*z)
+      else
+        return NaN+NaN*1im
+      end
+    end
+  end
+
+  function f(z::Symbol)::String
+    let a=a
+      return "exp(a$z)"
+    end
+  end
+  return f
+end
+
+function exp_az(z::ComplexF64,a::ComplexF64,k::Int)::ComplexF64
+  if k>=0
+    return a^k*exp(a*z)
+  else
+    return nothing
+  end
+end
+
+
+function exp_delay(ω::ComplexF64,τ::ComplexF64,m::Int,n::Int)::ComplexF64
   a=-1.0im
   u(z,l)=pow(z,l,m)
   f=0
@@ -69,6 +130,15 @@ function exp_delay(ω,τ,m,n)
   f*=a^m*exp(a*ω*τ)
   return f
 end
+function exp_delay(ω::Symbol,τ::Symbol)::String
+  return "exp(-i$ω$τ)"
+end
+
+###
+
+
+#TODO: improve closures by using let blocks or fastclosure package
+
 
 function generate_stsp_z(A,B,C,D)
   function stsp_z(z,n)
@@ -97,13 +167,7 @@ tau_delay=exp_delay
 
 #TODO create a macro for generating functions
 
-function exp_az(z::ComplexF64,a::ComplexF64,k::Int)::ComplexF64
-  if k>=0
-    return a^k*exp(a*z)
-  else
-    return nothing
-  end
-end
+
 
 
 # function powa(z::ComplexF64,k::Int,a::Int)

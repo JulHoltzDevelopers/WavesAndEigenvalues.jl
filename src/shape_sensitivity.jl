@@ -326,7 +326,7 @@ function forward_finite_differences_shape_sensitivity(mesh::Mesh,dscrp,C,surface
 
                 push!(G,Term(coeff,func,params,symbol,operator))
             end
-            new_sol, n, flag = householder(G,sol.params[sol.eigval],maxiter=5, output = false, n_eig_val=3,order=3)
+            new_sol, n, flag = householder(G,sol.params[sol.eigval],maxiter=5, output = false, nev=3,order=3)
             sens[crdnt,pnt_idx]=(new_sol.params[new_sol.eigval]-sol.params[sol.eigval])/(2h)
         end
 

@@ -129,3 +129,15 @@ function bloch_expand(mesh::Mesh,sol::Solution,b=:b)
     end
     return v
 end
+
+function bloch_expand(mesh::Mesh,vec::Array,b::Real=0)
+    naxis=mesh.dos.naxis
+    nxsector=mesh.dos.nxsector
+    DOS=mesh.dos.DOS
+    v=zeros(ComplexF64,naxis+nxsector*DOS)
+    v[1:naxis]=vec[1:naxis]
+    for s=0:DOS-1
+        v[naxis+1+s*nxsector:naxis+(s+1)*nxsector]=vec[naxis+1:naxis+nxsector].*exp(+2.0im*pi/DOS*b*s)
+    end
+    return v
+end

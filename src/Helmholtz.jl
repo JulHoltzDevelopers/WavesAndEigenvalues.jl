@@ -4,15 +4,16 @@ Module providing functionality to numerically discretize the (thermoacoustic) He
 module Helmholtz
 import SparseArrays, LinearAlgebra, ProgressMeter
 import FFTW: fft
-using ..Meshutils, ..NLEVP #TOOOcheck where find_smplx is introduced to scope
+using ..Meshutils, ..NLEVP #TODO:check where find_smplx is introduced to scope
 import ..Meshutils: get_line_idx
 import ..NLEVP: generate_1_gz
 include("Meshutils_exports.jl")
 include("NLEVP_exports.jl")
-include("FEM.jl")
+include("./FEM/FEM.jl")
 include("shape_sensitivity.jl")
 include("Bloch.jl")
 export discretize
+
 ##
 function outer(ii,aa,jj,bb)
     #TODO: preallocation
@@ -31,64 +32,38 @@ function outer(ii,aa,jj,bb)
 end
 
 """
-    L=discretize(mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=true,source=false)
+    L=discretize(mesh, dscrp, C; order=:lin, b=:__none__, mass_weighting=true,source=false, output=true)
 
 Discretize the Helmholtz equation using the mesh `mesh`.
 
 # Arguments
 - `mesh::Mesh`: tetrahedral mesh
-- `dscrp::Dict `: dictionary containing information on the equations to be solved. Thgese include standard wave propagation, boundary conditions, flame responses. See below for more info
+- `dscrp::Dict `: dictionary containing information on where to apply physical constraints. Such as standard wave propagation, boundary conditions, flame responses, etc.
 - `C:Array`: array defining the speed of sound. If `length(C)==length(mesh.tetrahedra)` the speed of sound is constant along one tetrahedron. If `length(C)==size(mesh.points,2)` the speed of sound is linearly interpolated between the vertices of the mesh.
-- `order::Symbol = :1`: optional paramater to select between first (`order==:1` the default), second (`order==:2`),or hermitian-order (`order==:h`) finite elements.
+- `order::Symbol = :lin`: optional paramater to select between first (`order==:lin` the default), second (`order==:quad`),or hermitian-order (`order==:herm`) finite elements.
 - `b::Symbol=:__none__`: optional parameter defining the Bloch wave number. If `b=:__none__` (the default) no Blochwave formalism is applied.
 - `mass_weighting=true`: optional parameter if true mass matrix is used as weighting matrix for householder, otherwise this matrix is not set.
 - `source::Bool=false`: optional parameter to toggle the return of a source vector (experimental)
+- `output::Bool=false': optional parameter to toggle live progress report.
 
 # Returns
 - `L::LinearOperatorFamily`: parametereized discretization of the specified Helmholtz equation.
 - `rhs::LinearOperatorFamily`: parameterized discretization of the source vector. Only returned if `source==true`.  (experimental)
-
-## Accepted values for `dscrp` dictionary
-Currently supported entries for describing the physics of the problem are
-### Volume equations
-- `dscrp["volumeDomain"] = (:interior,())`: discretizes the mass and stiffnes matrices of the helmholtz equation on the specified "volumeDomain".
-- `dscrp["volumeDomain"] = (:flame,(gamma,rho,nglobal,x_ref,n_ref,n_sym,tau_sym,n_val,tau_val))`: discretizes the flame matrix non-homogeneous TA helmholtz equation using an `n-τ` model on the specified "volumeDomain". The needed inputs are:
-    - `gamma`: heat capacity ratio
-    - `rho`:   density
-    - `nglobal`: total heat release over velocity, Q/U
-    - `x_ref`: reference position for velocity feedback
-    - `n_ref`: gradient of velocity feedback
-    - `n_sym`: symbol to be used for `n`
-    - `tau_sym`: symbol to be used for `τ`
-    - `n_val`: default value for `n`
-    - `tau_val`: default value for `τ`
-- `dscrp["volumeDomain"] = (:flame,(gamma,rho,nglobal,x_ref,n_ref,FTF))`: discretizes the flame matrix non-homogeneous TA helmholtz equation using a frequency-dependent user-defined `FTF(ω)` model on the specified "volumeDomain". The needed inputs are:
-    - The defined FTF function should be defined in `algebra.jl`, and contain routines to calculate its derivatives w.r.t. ω.
-### Boundary equation
-- `dscrp["boundaryDomain"] = (:admittance,(:Symbol, value))`: discretizes the boundary matrix with constant admittance `value` on the specified "boundaryDomain"
-- `dscrp["boundaryDomain"] = (:admittance,(Y(ω)),)`: discretizes the boundary matrix with a frequency-dependent admittance specified by the function `Y(ω)` on the specified "boundaryDomain"
-    - The defined function for the admittance should be defined in `algebra.jl`, and contain routines to calculate its derivatives w.r.t. ω.
-- `dscrp["boundaryDomain"] = (:admittance,(A,B,C,D)`: discretizes the boundary matrix with a state-space model admittance specified by the function `C_s(iωI-A)^{-1}B` on the specified "boundaryDomain"
-
-### Available but undocumented equations
-- speaker: simulate the response to a forced speaker
-- flameresponse: simulate the response to the one-way flame coupling with the acoustics
-- other soecific flame models (plain FTF, fancy flame)
 """
-function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=true, source=false)
+function discretize(mesh::Mesh, dscrp, C; order=:lin, b=:__none__, mass_weighting=true, source=false, output=true)
     triangles,tetrahedra,dim=aggregate_elements(mesh,order)
     N_points=size(mesh.points,2)
 
 
     if length(C)==length(mesh.tetrahedra)
         C_tet=C
-        if mesh.tri2tet[1]==0xffffffff
+        if length(mesh.tri2tet)!=0 && mesh.tri2tet[1]==0xffffffff #TODO: Initialize as empty instead with sentinel value
             link_triangles_to_tetrahedra!(mesh)
         end
         C_tri=C[mesh.tri2tet]
-    elseif length(c)==size(mesh.points,2)
-        C_tet=Array{UInt32,1}[] #TODO: Preallocation
-        C_tri=Array{UInt32,1}[]
+    elseif length(C)==size(mesh.points,2)
+        C_tet=Array{Float64,1}[] #TODO: Preallocation
+        C_tri=Array{Float64,1}[]
         for tet in tetrahedra
             push!(C_tet,C[tet[1:4]])
         end
@@ -128,11 +103,11 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
         #txt_filt="*1($b)"
         #bloch_filt=pow0
         L.params[b]=0.0+0.0im
-        if order==:1
+        if order==:lin
             dim-=mesh.dos.nxbloch
-        elseif order==:2
+        elseif order==:quad
             dim-=mesh.dos.nxbloch+mesh.dos.nxbloch_ln
-        elseif order==:h
+        elseif order==:herm
             dim-=4*mesh.dos.nxbloch #TODO: check blochify for hermitian elements
         end
         #N_points_dof=N_points-mesh.dos.nxbloch
@@ -142,19 +117,19 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
     end
     #wrapper for FEM constructors TODO: use multipledispatch and move to FEM.jl
     function stiff(J,c)
-        if order==:1
+        if order==:lin
             if length(c)==1
                 return -c^2*s43nv1nu1(J)
             elseif length(c)==4
                 return -s43nv1nu1cc1(J,c)
             end
-        elseif order==:2
+        elseif order==:quad
             if length(c)==1
                 return -c^2*s43nv2nu2(J)
             elseif length(c)==4
                 return -s43nv2nu2cc1(J,c)
             end
-        elseif order==:h
+        elseif order==:herm
             if length(c)==1
                 return -c^2*s43nvhnuh(J)
             elseif length(c)==4
@@ -163,86 +138,115 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
         end
     end
     function mass(J)
-        if order==:1
+        if order==:lin
             return s43v1u1(J)
-        elseif order==:2
+        elseif order==:quad
             return s43v2u2(J)
-        elseif order==:h
+        elseif order==:herm
             return s43vhuh(J)#massh(J)
         end
     end
 
     function bound(J,c)
-        if order==:1
+        if order==:lin
             if length(c)==1
                 return c*s33v1u1(J)
-            elseif length(c)==4
+            elseif length(c)==3
                 return s33v1u1c1(J,c)
             end
-        elseif order==:2
+        elseif order==:quad
             if length(c)==1
                 return c*s33v2u2(J)
-            elseif length(c)==4
+            elseif length(c)==3
                 return s33v2u2c1(J,c)
             end
-        elseif order==:h
+        elseif order==:herm
             if length(c)==1
                 return c*s33vhuh(J)
-            elseif length(c)==4
+            elseif length(c)==3
                 return s33vhuhc1(J,c)
             end
         end
     end
 
     function volsrc(J)
-        if order==:1
+        if order==:lin
             return s43v1(J)
-        elseif order==:2
+        elseif order==:quad
             return s43v2(J)
-        elseif order==:h
+        elseif order==:herm
             return s43vh(J)
         end
     end
 
     function gradsrc(J,n,x)
-        if order==:1
+        if order==:lin
             return s43nv1rx(J,n,x)
-        elseif order==:2
+        elseif order==:quad
             return s43nv2rx(J,n,x)
-        elseif order==:h
+        elseif order==:herm
             return s43nvhrx(J,n,x)
         end
     end
 
     function wallsrc(J,c)
         if length(c)==1
-            if order==:1
+            if order==:lin
                 return c*s33v1(J)
-            elseif order==:2
+            elseif order==:quad
                 return c*s33v2(J)
-            elseif order==:h
+            elseif order==:herm
                 return c*s33vh(J)
             end
         else
-            if order==:1
+            if order==:lin
                 return s33v1c1(J,c)
-            elseif order==:2
+            elseif order==:quad
                 return s33v2c1(J,c)
-            elseif order==:h
+            elseif order==:herm
                 return s33vhc1(J,c)
             end
         end
     end
 
+    #prepare progressbar
+    if output
+        n_task=0
+        for (domain,(type,data)) in dscrp
+            if type==:interior
+                task_factor=2
+            else
+                task_factor=1
+            end
+                n_task+=task_factor*length(mesh.domains[domain]["simplices"])
+        end
 
+        p = ProgressMeter.Progress(n_task,desc="Discretize... ", dt=.5,
+             barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),
+             barlen=20)
+
+    end
 
     ## build discretization matrices and vectors from domain definitions
     for (domain,(type,data)) in dscrp
         if type==:interior
             make=[:M,:K]
+            stiff_func=()
+            stiff_arg=()
+            stiff_txt=""
 
+        elseif type==:mass
+            make=[:M]
 
-        # TODO: Georg, please provide a description of the inputs needed by speaker in the discretize docstring
+        elseif type==:stiff
+            make=[:K]
+            stiff_func,stiff_arg,stiff_txt=data
+            for args in stiff_arg
+                for arg in args
+                    L.params[arg]=0.0
+                end
+            end
+
         elseif type in (:admittance,:speaker)
             make=[]
             if type==:speaker
@@ -299,7 +303,11 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                 ref_idx=0
                 flame_func = (FTF,)
                 flame_arg = ((:ω,),)
-                flame_txt = "FTF(ω)"
+                if applicable(FTF,:ω)
+                    flame_txt=FTF(:ω)
+                else
+                    flame_txt = "FTF(ω)"
+                end
             elseif length(data)==5 #plain FTF
                 gamma,rho,nglobal,x_ref,n_ref=data
                 ref_idx=0
@@ -405,6 +413,9 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                     append!(V,vv[:])
                     append!(I,ii[:])
                     append!(J,jj[:])
+                    if output
+                        ProgressMeter.next!(p)
+                    end
                 end
                 func=(pow2,)
                 arg=((:ω,),)
@@ -415,14 +426,19 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                 for (smplx,c) in zip(tetrahedra[mesh.domains[domain]["simplices"]],C_tet[mesh.domains[domain]["simplices"]])
                     CT=CooTrafo(mesh.points[:,smplx[1:4]])
                     ii,jj=create_indices(smplx)
-                    vv=stiff(CT,c) #TODO: move c^2 to stiff function
+                    #println("#############")
+                    #println("$CT")
+                    vv=stiff(CT,c)
                     append!(V,vv[:])
                     append!(I,ii[:])
                     append!(J,jj[:])
+                    if output
+                        ProgressMeter.next!(p)
+                    end
                 end
-                func=()
-                arg=()
-                txt=""
+                func=stiff_func
+                arg=stiff_arg
+                txt=stiff_txt
                 #V=-V
                 mat="K"
             elseif opr==:C
@@ -430,10 +446,13 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                 for (smplx,c) in zip(triangles[mesh.domains[domain]["simplices"]],C_tri[mesh.domains[domain]["simplices"]])
                     CT=CooTrafo(mesh.points[:,smplx[1:3]])
                     ii,jj=create_indices(smplx)
-                    vv=bound(CT,c) #TODO: move c to stiff function
+                    vv=bound(CT,c)
                     append!(V,vv[:])
                     append!(I,ii[:])
                     append!(J,jj[:])
+                    if output
+                        ProgressMeter.next!(p)
+                    end
                 end
                 V.*=-1im
                 func=boundary_func # func=(pow1,pow1,)
@@ -449,6 +468,9 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                     mm=volsrc(CT)
                     append!(S,mm[:])
                     append!(I,smplx[:])
+                    if output
+                        ProgressMeter.next!(p)
+                    end
                 end
                 smplx=tetrahedra[ref_idx]
                 CT=CooTrafo(mesh.points[:,smplx[1:4]])
@@ -469,6 +491,9 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
                     vv=wallsrc(CT,c)
                     append!(V,vv[:])
                     append!(I,ii[:])
+                    if output
+                        ProgressMeter.next!(p)
+                    end
                 end
                 V./=1im
                 func=(boundary_func...,pow1,)
@@ -500,7 +525,7 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
 
     if mass_weighting||bloch
         V=ComplexF64[]
-        I=UInt32[] #TODO: consider preallocation
+        I=UInt32[] #IDEA: consider preallocation
         J=UInt32[]
         for smplx in tetrahedra
             CT=CooTrafo(mesh.points[:,smplx[1:4]])
@@ -513,7 +538,7 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
     end
     if bloch
 
-        #TODO: implement switch to select weighting matrix
+        #IDEA: implement switch to select weighting matrix
 
         IJV=blochify(I,J,V,naxis,nxbloch,nsector,naxis_ln,nsector_ln,N_points,axis=false)#TODO check whether this matrix needs more blochfication... especially because tetrahedra is not periodic
         I=[IJV[1][1]..., IJV[1][2]..., IJV[1][3]...]
@@ -523,15 +548,15 @@ function discretize(mesh::Mesh, dscrp, C; order=:1, b=:__none__, mass_weighting=
 
         if 0<naxis #modify axis dof for essential boundary condition when blochwave number !=0
             DI=1:naxis
-            DV=ones(ComplexF64,naxis) #TODO: make this more compact
-            if order==:2
+            DV=ones(ComplexF64,naxis) #NOTE: make this more compact
+            if order==:quad
                 DI=vcat(DI,(N_points+1:naxis_ln).-nxbloch)
                 DV=vcat(DV,ones(ComplexF64,naxis_ln-N_points))
             end
             for idx=1:naxis
                 DV[idx]=1/M[idx,idx]
             end
-            if order==:2
+            if order==:quad
                 for (idx,ii) in enumerate((N_points+1:naxis_ln).-nxbloch)
                     DV[idx+naxis]=1/M[ii,ii]
                 end

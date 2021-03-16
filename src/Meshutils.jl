@@ -1,5 +1,5 @@
 """
-Module containing functionality to read and process tetrahedral meshes from gmsh.
+Module containing functionality to read and process tetrahedral meshes in gmsh or nastran format.
 """
 module Meshutils
 import LinearAlgebra, ProgressMeter
@@ -52,8 +52,9 @@ Definition of the mesh type
 - `points::Array`: 3×N array containing the coordinates of the N points defining the mesh.
 - `lines::List`: List of simplices defining the edges of the mesh
 - `triangles::List`: List of simplices defining the surface triangles of the mesh
+- `int_triangles::List`: List of simplices defining the interior triangles of the mesh
 - `tetrahedra::List`: List of simplices defining the tetrahedra of the mesh
-- `domains::Dict`: Dictionairy defining the domains of the mesh. See comments below.
+- `domains::Dict`: Dictionary defining the domains of the mesh. See comments below.
 - `file::String`: path to the file containing the mesh.
 - `tri2tet::Array`: Array of length `length(tetrahedra)` containing the indices of the connected tetrahedra.
 - `dos`: special field meant to contain symmetry information of highly symmetric meshes.
@@ -72,6 +73,7 @@ struct Mesh
     points
     lines
     triangles
+    int_triangles
     tetrahedra
     domains
     file
@@ -80,24 +82,38 @@ struct Mesh
 end
 ## constructor
 """
-    mesh=Mesh(file_name::String; scale=1)
+    mesh=Mesh(file_name::String; scale=1, inttris=false)
 
-read a tetrahedral mesh from gmsh file into `mesh`.
+read a tetrahedral mesh from gmsh or nastran file into `mesh`.
 The optional scaling factor `scale` may be used to scale the units of the mesh.
+The optional parameter `inttris` toggles whether triangles are sortet into two
+seperate lists for surface and internal triangles.
 """
-function Mesh(file_name::String;scale=1)
+function Mesh(file_name::String;scale=1,inttris=false)
     #mesh constructor
-    #check file format
-    local line
-    open(file_name,"r") do fid
-        line=readline(fid)
-        line=readline(fid)
-    end
-    if line[1]=='4'
-        points, lines, triangles, tetrahedra, domains =read_msh4(file_name)
+    ext=split(file_name,".")
+    if ext[end]=="msh"
+        #gmsh mesh file
+        #check file format
+        local line
+        open(file_name,"r") do fid
+            line=readline(fid)
+            line=readline(fid)
+        end
+        if line[1]=='4'
+            points, lines, triangles, tetrahedra, domains =read_msh4(file_name)
+        else
+            println("Please, convert msh-file to gmsh's .msh-format version 4!")
+            #points, lines, triangles, tetrahedra, domains =read_msh2(file_name)
+        end
+    elseif ext[end]=="nas" || ext[end]=="bdf"
+        points, lines, triangles, tetrahedra, domains =read_nastran(file_name)
+        # if isfile(ext[1]*"_surfaces.txt")
+        #     relabel_nas_domains!(domains,ext[1]*"_surfaces.txt")
+        # end
     else
-        println("Please, convert msh-file to gmsh's .msh-format version 4!")
-        #points, lines, triangles, tetrahedra, domains =read_msh2(file_name)
+        println("mesh type not supported")
+        return nothing
     end
 
     #sometimes elements are multiply defined, make them unique
@@ -105,15 +121,22 @@ function Mesh(file_name::String;scale=1)
     ulines=Array{UInt32,1}[]
     utriangles=Array{UInt32,1}[]
     utetrahedra=Array{UInt32,1}[]
+    uinttriangles=Array{UInt32,1}[]
 
     for ln in lines
         insert_smplx!(ulines,ln)
     end
-    for tri in triangles
-        insert_smplx!(utriangles,tri)
-    end
+
     for tet in tetrahedra
         insert_smplx!(utetrahedra,tet)
+    end
+
+    if inttris
+        utriangles,uinttriangles=assemble_triangles(utetrahedra)
+    else
+        for tri in triangles
+            insert_smplx!(utriangles,tri)
+        end
     end
 
     for dom in keys(domains)
@@ -130,22 +153,44 @@ function Mesh(file_name::String;scale=1)
         unique!(domains[dom]["simplices"])
     end
 
-    tri2tet=zeros(UInt32,length(utriangles))
-    tri2tet[1]=0xffffffff #magic sentinel value to check whether list is linked
-    Mesh(file_name, points*scale, ulines, utriangles, utetrahedra, domains, file_name,tri2tet,1)
+    if inttris
+        tri2tet=[zeros(UInt32,length(utriangles)),zeros(UInt32,length(uinttriangles),2)]
+    else
+        tri2tet=zeros(UInt32,length(utriangles))
+        if length(tri2tet)!=0
+            tri2tet[1]=0xffffffff #magic sentinel value to check whether list is linked
+        end
+    end
+    Mesh(file_name, points*scale, ulines, utriangles, uinttriangles, utetrahedra, domains, file_name,tri2tet,1)
+end
+#deprecated constructor
+function Mesh(file, points, lines, triangles, tetrahedra, domains, file_name, tri2tet, dos)
+    return Mesh(file, points, lines, triangles, [], tetrahedra, domains, file_name, tri2tet, dos)
 end
 
 #show mesh
 import Base.string
 function string(mesh::Mesh)
-    txt="""mesh: $(mesh.file)
-    #################
-    points:     $(size(mesh.points)[2])
-    lines:      $(length(mesh.lines))
-    triangles:  $(length(mesh.triangles))
-    tetrahedra: $(length(mesh.tetrahedra))
-    #################
-    domains: """
+    if isempty(mesh.int_triangles)
+        txt="""mesh: $(mesh.file)
+        #################
+        points:     $(size(mesh.points)[2])
+        lines:      $(length(mesh.lines))
+        triangles:  $(length(mesh.triangles))
+        tetrahedra: $(length(mesh.tetrahedra))
+        #################
+        domains: """
+    else
+        txt="""mesh: $(mesh.file)
+        #################
+        points:            $(size(mesh.points)[2])
+        lines:             $(length(mesh.lines))
+        triangles (surf):  $(length(mesh.triangles))
+        triangles (int):   $(length(mesh.int_triangles))
+        tetrahedra:        $(length(mesh.tetrahedra))
+        #################
+        domains: """
+    end
     for key in sort([key for key in keys(mesh.domains)])
         txt*=string(key)*", "
     end
@@ -212,9 +257,9 @@ end
 # end
 
 
-include("sorter.jl")
-include("annular_meshes.jl")
-include("vtk_write.jl")
+include("./Mesh/sorter.jl")
+include("./Mesh/annular_meshes.jl")
+include("./Mesh/vtk_write.jl")
 ##
 
 """
@@ -250,7 +295,7 @@ function read_msh4(file_name)
                     line=readline(fid)
                     dim, tag, dom=split(line)
                     dim=parse(UInt32,dim)
-                    dom=dom[2:end-1]
+                    dom=String(dom[2:end-1])
                     tag2dom[tag]=dom
                     domains[dom]=Dict()
                     domains[dom]["dimension"]=dim
@@ -260,7 +305,7 @@ function read_msh4(file_name)
             elseif fldname=="Entities"
                 line=readline(fid)
                 numPoints, numCurves, numSurfaces, numVolumes=parse.(UInt32,split(line))
-                for idx=1:4 #inititlaize entity dictionairy
+                for idx=1:4 #inititlaize entity dictionary
                     ent2dom[idx]=Dict()
                 end
                 for idx=1:numPoints
@@ -453,7 +498,7 @@ function read_msh2(file_name)
     return points, lines, triangles, tetrahedra, domains
 end
 
-
+include("./Mesh/read_nastran.jl")
 
 
 
@@ -466,20 +511,64 @@ end
 """
     link_triangles_to_tetrahedra!(mesh::Mesh)
 
-Find the tetrahedra that are connected to the triangles in mesh.triangles and store this information in mesh.tri2tet.
+Find the tetrahedra that are connected to the triangles in mesh.triangles (and mesh.inttriangles) and store this information in mesh.tri2tet.
 """
 function link_triangles_to_tetrahedra!(mesh::Mesh)
-    for (idt,tet) in enumerate(mesh.tetrahedra)
-        for tri in (tet[[1,2,3]],tet[[1,2,4]],tet[[1,3,4]],tet[[2,3,4]])
-            idx,ins=sort_smplx(mesh.triangles,tri)
-            if !ins
-                mesh.tri2tet[idx]=idt
+    if !isempty(mesh.int_triangles)
+        #IDEA: move this to constructor
+        for (idt,tet) in enumerate(mesh.tetrahedra)
+            for tri in (tet[[1,2,3]],tet[[1,2,4]],tet[[1,3,4]],tet[[2,3,4]])
+                idx,ins=sort_smplx(mesh.triangles,tri)
+                if !ins
+                    mesh.tri2tet[1][idx]=idt
+                else
+                    idx,ins=sort_smplx(mesh.int_triangles,tri)
+                    if !ins
+                        if mesh.tri2tet[2][idx,1]==0
+                            mesh.tri2tet[2][idx,1]=idt
+                        else
+                            mesh.tri2tet[2][idx,2]=idt
+                        end
+                    end
+                end
+            end
+        end
+
+    else
+        for (idt,tet) in enumerate(mesh.tetrahedra)
+            for tri in (tet[[1,2,3]],tet[[1,2,4]],tet[[1,3,4]],tet[[2,3,4]])
+                idx,ins=sort_smplx(mesh.triangles,tri)
+                if !ins
+                    mesh.tri2tet[idx]=idt
+                end
             end
         end
     end
     return nothing
 end
+##
+function assemble_triangles(tetrahedra)
+    int_triangles=Array{UInt32,1}[]
+    ext_triangles=Array{UInt32,1}[]
+    for tet in tetrahedra#loop over all tetrahedra
+        for tri_idcs in [[1,2,3],[1,2,4],[1,3,4],[2,3,4]] #loop over all 4 triangles of the tetrahedron
+            tri=tet[tri_idcs]
+            idx,notinside=sort_smplx(ext_triangles, tri)
+            if notinside #triangle occurs for the first time
+                #IDEA: there is no sanity check. If tetrahedra are ill defined a
+                #triangle might show up three times. That would be fatal.
+                #may implement some low-level-sanity checks ensuring data
+                #integrity
 
+                insert!(ext_triangles,idx,tri)
+            else #triangle occurs for the second time, it must be an interior triangle.
+                deleteat!(ext_triangles,idx)
+                insert_smplx!(int_triangles,tri)
+            end
+        end
+    end
+    return ext_triangles,int_triangles
+end
 ##
 """
     new_mesh=octosplit(mesh::Mesh)
@@ -510,7 +599,7 @@ function octosplit(mesh::Mesh)
     for (idx,ln) in enumerate(mesh.lines)
         points[:,N_points+idx]= sum(mesh.points[:,ln],dims=2)./2
     end
-    #create new tetrahedra by splitting the oldones
+    #create new tetrahedra by splitting the old ones
     tetrahedra=Array{UInt32}[]
     for tet in mesh.tetrahedra
         A,B,C,D=tet #old vertices
@@ -563,6 +652,20 @@ function octosplit(mesh::Mesh)
         insert_smplx!(triangles,[C,AC,BC])
         insert_smplx!(triangles,[AB,AC,BC])
     end
+
+    #split the old interior triangles
+    #TODO:Testing
+    inttriangles=Array{UInt32}[]
+    # for tri in mesh.int_triangles
+    #     A,B,C=tri
+    #     AB=N_points+find_smplx(mesh.lines,[A,B])
+    #     AC=N_points+find_smplx(mesh.lines,[A,C])
+    #     BC=N_points+find_smplx(mesh.lines,[B,C])
+    #     insert_smplx!(inttriangles,[A,AB,AC])
+    #     insert_smplx!(inttriangles,[B,AB,BC])
+    #     insert_smplx!(inttriangles,[C,AC,BC])
+    #     insert_smplx!(inttriangles,[AB,AC,BC])
+    # end
 
     ## relabel tetrahedra
     tet_labels=Array{UInt32}(undef,N_tet,8)
@@ -637,8 +740,10 @@ function octosplit(mesh::Mesh)
     end
 
     tri2tet=zeros(UInt32,length(triangles))
-    tri2tet[1]=0xffffffff #magic sentinel value to check whether list is linked
-    return Mesh(mesh.file, points, [], triangles, tetrahedra, domains, mesh.file,tri2tet,1)
+    if length(tri2tet)>0
+        tri2tet[1]=0xffffffff
+    end #magic sentinel value to check whether list is linked
+    return Mesh(mesh.file, points, [], triangles, inttriangles, tetrahedra, domains, mesh.file,tri2tet,1)
 end
 
 
@@ -842,11 +947,19 @@ function get_surface_points(mesh::Mesh,output::Bool=true)
         #blochify surface points
         for idx in surface_points
             bidx=idx -mesh.dos.naxis
+            #reference surface
             if 0 < bidx <= mesh.dos.nxbloch
                 append!(tri_mask[idx],tri_mask[end-mesh.dos.nxbloch+bidx])
                 append!(tet_mask[idx],tet_mask[end-mesh.dos.nxbloch+bidx])
-                unique!(tri_mask)
-                unique!(tet_mask)
+                #unique!(tri_mask)
+                #unique!(tet_mask)
+                unique!(tri_mask[idx])
+                unique!(tet_mask[idx])
+                #symmetrize
+                append!(tri_mask[end-mesh.dos.nxbloch+bidx],tri_mask[idx])
+                append!(tet_mask[end-mesh.dos.nxbloch+bidx],tet_mask[idx])
+                unique!(tri_mask[end-mesh.dos.nxbloch+bidx])
+                unique!(tet_mask[end-mesh.dos.nxbloch+bidx])
             end
         end
     end
@@ -953,29 +1066,124 @@ function get_normal_vectors(mesh::Mesh,output::Bool=true)
 end
 
 """
-    generate_field(mesh::Mesh,func,el_type=0)
+    generate_field(mesh::Mesh,func;el_type=0)
 
-Generate a field by applying the function `func` onto the mesh `mesh`. The element type is either
+Generate field from function `func`for mesh `mesh`. The element type is either
 `el_type=0` for field values associated with the mesh tetrahedra or `el_type=1`
-for field values associated with the mesh vertices. The function `func` must accept
-exactly three input numerical arguments, corresponding to the three space dimensions.
+for field values associated with the mesh vertices. The function must accept
+three input arguments corresponding to the three space dimensions.
 """
-function generate_field(mesh::Mesh,func,el_type=0)
+function generate_field(mesh::Mesh,func;order::Symbol=:const)
     #TODO: implement el_type=2
-    if el_type==0
+    if order==:const
         field=zeros(Float64,length(mesh.tetrahedra))#*347.0
         for idx=1:length(mesh.tetrahedra)
             cntr=sum(mesh.points[:,mesh.tetrahedra[idx]],dims=2)/4 #centerpoint of a tetrahedron is arithmetic mean of the vertices
             field[idx]=func(cntr...)
         end
-    else
+    elseif order==:lin
         field=zeros(Float64,size(mesh.points,2))
         for idx in 1:size(mesh.points,2)
             pnt=mesh.points[:,idx]
             field[idx]=func(pnt...)
         end
+    else
+        println("Error: Can't generate field order $order not supported!")
+        return nothing
     end
     return field
+end
+##legacycode
+# function generate_field(mesh::Mesh,func;el_type=0)
+#     #TODO: implement el_type=2
+#     if el_type==0
+#         field=zeros(Float64,length(mesh.tetrahedra))#*347.0
+#         for idx=1:length(mesh.tetrahedra)
+#             cntr=sum(mesh.points[:,mesh.tetrahedra[idx]],dims=2)/4 #centerpoint of a tetrahedron is arithmetic mean of the vertices
+#             field[idx]=func(cntr...)
+#         end
+#     else
+#         field=zeros(Float64,size(mesh.points,2))
+#         for idx in 1:size(mesh.points,2)
+#             pnt=mesh.points[:,idx]
+#             field[idx]=func(pnt...)
+#         end
+#     end
+#     return field
+# end
+"""
+    data,surf_keys,vol_keys=color_domains(mesh::Mesh,domains=[])
+
+Create data fields containing an integer number corresponding to the local
+domain.
+
+# Arguments
+- `mesh::Mesh`: mesh to be colored
+- `domains::List`: (optional) list of domains that are to be colored. If empty  all domains will be colored.
+
+# Returns
+- `data::Dict`: Dictionary containing a key for each colored domain plus magic keys `"__all_surfaces__"` and `"__all_volumes__"` holding all colors in one field. These magic fields may not work correctly if the domains are not disjoint.
+- `surf_keys::Dict`: Dictionary mapping the surface domain names to their indeces.
+- `vol_keys::Dict`: Dictionary mapping the volume domain names to their indeces.
+
+# Notes
+The `data`variable is designed to flawlessly work with `vtk_write` for
+visualization with paraview. Check the "Interpret Values as Categories" box in
+paraview's color map editor for optimal visualization.
+
+See also: [`vtk_write`](@ref)
+"""
+function color_domains(mesh::Mesh,domains=[])
+    number_of_triangles=length(mesh.triangles)
+    number_of_tetrahedra=length(mesh.tetrahedra)
+    #IDEA: check number of domains and choose datatype accordingly (UInt8 might be possible)
+    tri_color=zeros(UInt16,number_of_triangles)
+    tet_color=zeros(UInt16,number_of_tetrahedra)
+    data=Dict()
+    surf_keys=Dict()
+    vol_keys=Dict()
+    if length(domains)==0
+        domains=sort([key for key in keys(mesh.domains)])
+    end
+    surf_idx=0
+    vol_idx=0
+    for key in domains
+        if key in keys(mesh.domains)
+            dom=mesh.domains[key]
+        else
+            println("Warning: No domain named '$key' in mesh.")
+            continue
+        end
+        smplcs=dom["simplices"]
+        dim=dom["dimension"]
+        if dim==2
+            surf_idx+=1
+
+            if any(tri_color[smplcs].!=0)
+                println("domain $key is overlapping")
+            end
+            tri_color[smplcs].=surf_idx
+            data[key]=zeros(Int64,number_of_triangles)
+            data[key][smplcs].=surf_idx
+            surf_keys[key]=surf_idx
+            println("surface:$key-->$surf_idx")
+        elseif dim==3
+            vol_idx+=1
+            if any(tet_color[smplcs].!=0)
+                println("domain $key is overlapping")
+            end
+            tet_color[smplcs].=vol_idx
+            data[key]=zeros(Int64,number_of_tetrahedra)
+            data[key][smplcs].=vol_idx
+            vol_keys[key]=vol_idx
+            println("volume:$key-->$vol_idx")
+        end
+    end
+
+    data["__all_surfaces__"]=tri_color
+    data["__all_volumes__"]=tet_color
+
+ return data,surf_keys,vol_keys
 end
 
 #################################################

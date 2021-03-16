@@ -1,6 +1,13 @@
-# Helmholtz
-```@docs
-WavesAndEigenvalues.Helmholtz
-WavesAndEigenvalues.Helmholtz.discretize
-WavesAndEigenvalues.Helmholtz.bloch_expand
+# The Helmholtz module
+
+## Exported functionality:
+```@autodocs
+Modules = [WavesAndEigenvalues.Helmholtz]
+Private=false
+```
+
+## Private functionality:
+```@autodocs
+Modules = [WavesAndEigenvalues.Helmholtz]
+Public=false
 ```

@@ -185,13 +185,15 @@ end
 
 function generate_multi_indices_at_order(k;to_disk=false,compressed=false)
   if to_disk
-    pack="../src/compressed_perturbation_data/" #This file location is relative to the deps directory as this is the one where build pkg is run.
+    pack="../src/NLEVP/compressed_perturbation_data/" #This file location is relative to the deps directory as this is the one where build pkg is run.
     dir="$k/"
   else
     Mu=[ Array{Int16,1}[] for i in 1:tuple2idx((k,0),k) ] #TODO specify type
   end
   if to_disk && !ispath(pack*dir)
     mkpath(pack*dir)
+  elseif to_disk && ispath(pack*dir)
+    return nothing
   end
   for n=1:k
     key=(0,n)
@@ -426,7 +428,7 @@ function perturb_disk(L,N,v0,v0Adj)
 
     #normalization
     c=0.0+0.0im
-    println("order: $k, time: $(time()-zeit)")
+    #println("order: $k, time: $(time()-zeit)")
     for l=1:k-1
         c-=.5*v[l+1]'*v[k-l+1]
         #c+=v[l+1]'*v[k-l+1]

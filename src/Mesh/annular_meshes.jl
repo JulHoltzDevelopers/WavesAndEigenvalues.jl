@@ -18,7 +18,7 @@ function three_points_to_plane(A)
     a=LinearAlgebra.cross(u,v)
     a/=LinearAlgebra.norm(a) #normalize
     d=-LinearAlgebra.dot(a,C)
-    if d<1E-7 #TODO: fidn a better fix for the intersection problem
+    if d<1E-7 #TODO: find a better fix for the intersection problem
         d=0.0
     end
     a,b,c=a
@@ -71,11 +71,11 @@ end
 Ensure that the parameterization of the plane "pln" has a normal that is directed twoards `testpoint`.
 If necessary reparametrize `pln`.
 """
-function make_normal_outwards!(pln,testpoint)
+function make_normal_outwards(pln,testpoint)
     foot=find_foot_of_perpendicular(testpoint,pln)
     scalar_product=LinearAlgebra.dot(pln[1:3],testpoint-foot)
     pln*=-sign(scalar_product)
-    return
+    return pln
 end
 
 """
@@ -267,6 +267,7 @@ Multiple styles can be mixed in one domain specification. An example for `doms` 
     doms=[("Interior", :full), ("Outlet", :unit), ("Flame", :half)]
 """
 function extend_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloch", unit=false)
+    collect_lines!(mesh) #TODO: make it independent of line collection
     npoints=size(mesh.points,2)
 
     bloch=[]
@@ -328,20 +329,19 @@ function extend_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloch", u
     pln=three_points_to_plane(tri)
     pnt=find_foot_of_perpendicular([0.,0.,0.],pln)
     testpoint_idx=find_testpoint_idx(smplx,mesh.tetrahedra[tetmap[smplx_idx]])
-    make_normal_outwards!(pln,mesh.points[:,testpoint_idx])
+    pln=make_normal_outwards(pln,mesh.points[:,testpoint_idx])
 
 
     # compute bloch plane
-    smplx_idx=mesh.domains[blch_name]["simplices"][2]
+    smplx_idx=mesh.domains[blch_name]["simplices"][1]
     smplx=mesh.triangles[smplx_idx]
     tri2=mesh.points[:,smplx]
     bpln=three_points_to_plane(tri2)
     testpoint_idx=find_testpoint_idx(smplx,mesh.tetrahedra[tetmap[smplx_idx]])
-    make_normal_outwards!(bpln,mesh.points[:,testpoint_idx])
+    bpln=make_normal_outwards(bpln,mesh.points[:,testpoint_idx])
     #little tests
     #check=is_point_in_plane(tri2[:,2],pln)
     #tri_refl=reflect_point_at_plane(tri2[:,2],pln)
-
 
     # do the reflection
     nbloch=length(bloch)
@@ -568,7 +568,7 @@ function extend_mesh(mesh::Mesh, doms; sym_name="Symmetry", blch_name="Bloch", u
     full_mesh=Mesh(mesh.file,fpoints,lines,triangles, tetrahedra, domains, file_txt, tri2tet, symmetry_info)
     return full_mesh
 end
-## wrapper fpr finder routines  to Mesh type
+## wrapper for finder routines to Mesh type
 """
     sidx=get_point_sector(mesh::Mesh,pnt_idx)
 

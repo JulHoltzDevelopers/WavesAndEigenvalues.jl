@@ -1,9 +1,14 @@
 **/.DS_Store
-src/compressed_perturbation_data
+src/NLEVP/compressed_perturbation_data
 deps/build.log
 **.vtu
 **.mesh
-<<<<<<< HEAD
+**.tar.gz
+**.out
+**.png
+**.html
+**.txt
 **.sh
-=======
->>>>>>> f06cb95f65fd8f7049fa3172d24ed610bdfa3228
+**.ipynb
+docs/notebooks/
+docs/build/

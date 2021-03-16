@@ -1,11 +1,25 @@
 ## NLEVP
+"""
+    Term{T}
+
+Single term of a linear operator family.
+
+# Fields
+- `coeff::T`: matrix coefficient of the term
+- `func::Tuple`: tuple of scalar-valued functions multiplying the matrix coefficient
+- `symbol::String`: character string for displaying the function(s)
+- `params::Tuple`: tuple of tuples containing function symbols for each function
+- `operator:String`: String for displaying the matrix coefficient
+- `varlist::Array{Symbol,1}`: Array containing all symbols of fucntion arguments
+that are used at least once
+"""
 struct Term{T}
   coeff::T
   func::Tuple
   symbol::String
   params::Tuple
   operator::String
-  varlist::Array{Symbol,1}
+  varlist::Array{Symbol,1} #TODO: this is redundant information
 end
 
 #constructor
@@ -19,35 +33,102 @@ function Term(coeff,func::Tuple,params::Tuple,symbol::String,operator::String)
   unique!(varlist)
   return Term(coeff,func,symbol,params,operator, varlist)
 end
-"""
-Stores the solution(s) returned by the nonlinear eigenvalue solvers.
 
-# Stored Data
-- `eigval`: symbol that represents the eigenvalue
-- `eigval_pert`: Dictionary containing eigenvalue perturbation corrections
-- `params`: Dictionary containing the list of parameters at which the eigenvalue was identified
-- `v`: direct eigenvector
-- `v_adj`: adjoint eigenvector
-- `v_pert`: Dictionary containing eigenvector perturbation correction
-
-# Methods
-- `Solution(:Symbol, val, n)`: Estimates the eigenvalue using perturbation theory at order `n`th order perturbation theory when the parameter `:Symbol` takes value `val`
 """
-mutable struct Solution #ToDo: make immutable and parametrized type
+    term=Term(coeff,func::Tuple,params::Tuple,operator::String)
+
+Standard constructor for type `Term`.
+
+# Arguments
+- `coeff`: matrix coefficient of the term
+- `func::Tuple`: tuple of scalar-valued functions multiplying the matrix coefficient
+- `params::Tuple`: tuple of tuples containing function symbols for each function
+- `operator:String`: String for displaying the matrix coefficient
+
+# Notes
+
+The rendering of the functions of `term` ist automotized. If the passed functions
+implement a method `f(z::Symbol)` then this method is used, otherwise the
+functions will be simply displayed with the string `f`. You can overwrite this
+behavior by explicitly passing a string for the function display using the syntax
+
+  term =Term(coeff,func::Tuple,params::Tuple,symbol::String,operator::String)
+
+where the extra argument `symbol`is the string used to display the function.
+
+See also: [LinearOperatorFamily](@ref)
+"""
+function Term(coeff,func::Tuple,params::Tuple,operator::String)
+  symbol=""
+  for (f,p) in zip(func,params)
+    if applicable(f,p...)
+      symbol*=f(p...)
+    else
+      symbol*="f("
+      for idx = 1:length(p)-1
+        symbol*="$(p[idx]),"
+      end
+      symbol*="$(p[end]))"
+    end
+  end
+  return Term(coeff,func,params,symbol,operator)
+end
+
+
+#Solution object
+"""
+    Solution
+
+Type for the solution of an iterative eigensolver.
+
+# Fields
+- `params`: Dictionary mapping parameter symbols to their values
+- `v`: right (direct) eigenvector
+- `v_adj`: left (adjoint) eigenvector
+- `eigval`: the symbol of the parameter that is the eigenvalue
+- `eigval_pert`: extra data for asymptotic series expansion of the eigenvalue
+- `v_pert`: extra data for asymptotic series expansion of the eigenvector
+- `auxval`: the symbol of the parameter that is the auxiliary eigenvalue
+
+See also: [LinearOperatorFamily](@ref)
+"""
+mutable struct Solution #IDEA: make immutable and parametrized type
   params
   v
   v_adj
   eigval
   eigval_pert
   v_pert
+  auxval
 end
 #constructor
+"""
+    sol=Solution(params,v,v_adj,eigval,auxval=Symbol())
 
-function Solution(params,v,v_adj,eigval)
-  return Solution(deepcopy(params),v,v_adj,eigval,Dict{Symbol,Any}(),Dict{Symbol,Any}()) #TODO: copy params?
+Standard constructor for a solution object. See [Solution](@ref) for details.
+"""
+function Solution(params,v,v_adj,eigval,auxval=Symbol())
+  return Solution(deepcopy(params),v,v_adj,eigval,Dict{Symbol,Any}(),Dict{Symbol,Any}(),auxval) #TODO: copy params?
 end
 
-mutable struct LinearOperatorFamily
+"""
+    LinearOperatorFamily
+
+Type for a linear operator family. The type is mutable.
+
+# Fields
+- `terms`: Array of terms forming the operator family
+- `params`: Dictionary mapping parameter symbols to their values
+- `eigval`: the symbol of the parameter that is the eigenvalue
+- `auxval`: the symbol of the parameter that is the auxiliary eigenvalue
+- `active`: list of symbols that can be actively change when using an instance of
+the family as a function.
+- `mode`: mode that is controlling which terms are evalauted when calling an
+instance of the family. This field is not to be modified by the user.
+
+See also: [Solution](@ref), [Term](@ref)
+"""
+mutable struct LinearOperatorFamily #TODO: add example to the doc
   terms::Array{Term,1}
   params::Dict{Symbol,ComplexF64}
   eigval::Symbol
@@ -56,7 +137,31 @@ mutable struct LinearOperatorFamily
   mode::Symbol
 end
 
-#constructor
+#constructors
+"""
+    L=LinearOperatorFamily(params,values)
+
+Standard constructor for an empty Linear operator family.
+
+# Arguments
+- `params`: List of parameter symbols
+- `values`: List of corresponding parameter values
+
+# Note
+The first parameter appearing in `params` will be assigned as eigenvalue. If
+there are more than 1 parameters in the list, the last parameter will be designated
+as auxiliary eigenvalue. (These choices can be changed after construction)
+If `values`is omitted, then all parameters will be initialized with `NaN+NaN*im`.
+If also `params` is omitted the family will be initialized with `:λ` as its
+eigenvalue an no auxiliary eigenvalue.
+
+Terms can be added to the family using the `+` operator or the more memory efficient
+`push!` function. For instance `L+=term` or `push!(L,term)` both add `term`
+to the list of terms.
+
+See also: [Solution](@ref), [Term](@ref)
+"""
+# standard constructors
 function LinearOperatorFamily(params,values)
   terms=Term[]
   eigval=Symbol(params[1])
@@ -73,10 +178,16 @@ function LinearOperatorFamily(params,values)
   mode=:all
   return LinearOperatorFamily(terms,pars,eigval,auxval,active,mode)
 end
+function LinearOperatorFamily()
+  return LinearOperatorFamily(["λ",],[NaN+NaN*1im,])
+end
+function LinearOperatorFamily(params)
+  return LinearOperatorFamily(params,[NaN+NaN*1im for a in params])
+end
 
 #loader
 """
-  L=LinearOperatorFamily(fname::String)
+    L=LinearOperatorFamily(fname::String)
 
 Load and construct `LinearOperatorFamily` from file `fname`.
 
@@ -127,8 +238,6 @@ function save(fname,L::LinearOperatorFamily)
     end
     eq*="+"*string(term)
   end
-
-
 
   open(fname,"w") do f
     write(f,"# LinearOperatorFamily version 0\n")
@@ -193,29 +302,78 @@ end
 # es gibt nur drei arten: tags, variablen, listen/tuple rest ist eval
 
 import Base.push!
-function push!(a::LinearOperatorFamily,b::Term)
-   push!(a.terms,b)
+function push!(L::LinearOperatorFamily,T::Term)
+  d=Dict()
+  for (idx,term) in enumerate(L.terms)
+    d[(term.func, term.params)]=idx
+  end
+  signature=(T.func,T.params)
+  if signature in keys(d) #change existing term if signature known
+    idx=d[signature]
+    coeff=L.terms[idx].coeff+T.coeff
+    if LinearAlgebra.norm(coeff)==0
+      deleteat!(L.terms,idx) #delte if resulting coeff is 0
+      #check for unbound variables and delete
+      vars=[]
+      for term in L.terms
+        for pars in term.params
+          for par in pars
+            if par ∉ vars
+              push!(vars,par)
+            end
+          end
+        end
+      end
+      for par in keys(T.params)
+        if par ∉ vars
+          delete!(L.params,par)
+        end
+      end
+
+    else
+      L.terms[idx]=Term(coeff,L.terms[idx].func,L.terms[idx].symbol,L.terms[idx].params,L.terms[idx].operator,L.terms[idx].varlist) #overwrite term if coeff is non-zero
+    end
+  else #add term if signature is new
+    for pars in T.params
+      for par in pars
+        if par ∉ keys(L.params)
+          L.params[par]=NaN+NaN*1im #initialize variable if its new
+        end
+      end
+    end
+    push!(L.terms,T)
+  end
 end
 # function push!(a::LinearOperatorFamily,b::LinearOperatorFamily)
 #    push!(a.terms,b.terms)
 # end
 #
 #
-# function (+)(a::LinearOperatorFamily,b::LinearOperatorFamily)
-#   terms=push!(deepcopy(a.terms),b.terms...)
-#   return LinearOperatorFamily(terms)
-# end
-#
-# function (+)(a::LinearOperatorFamily,b::Term)
-#   terms=push!(deepcopy(a.terms),b)
-#   return LinearOperatorFamily(terms)
-# end
-#
-# function (+)(b::Term,a::LinearOperatorFamily)
-#   terms=push!(deepcopy(a.terms),b)
-#   return LinearOperatorFamily(terms)
-# end
-#TODO write macro @commute
+import Base.(+)
+function (+)(a::LinearOperatorFamily,b::Term)
+  L=deepcopy(a)
+  push!(L,b)
+  return L
+end
+function (+)(b::Term,a::LinearOperatorFamily,)
+  L=deepcopy(a)
+  push!(L,b)
+  return L
+end
+import Base.(-)
+function (-)(a::LinearOperatorFamily,b::Term)
+  L=deepcopy(a)
+  push!(L,Term(-b.coeff,b.func,b.symbol,b.params,b.operator,b.varlist))
+  return L
+end
+function (-)(b::Term,a::LinearOperatorFamily)
+  L=deepcopy(a)
+  for i=1:length(L.terms)
+    L.terms[i].coeff*=-1
+  end
+  push!(L,b)
+  return L
+end
 
 
 
@@ -271,15 +429,18 @@ function string(sol::Solution)
   Parameters:
   """
   for (key,val) in sol.params
-    if key !=  sol.eigval && key!=:λ
+    if key!=sol.eigval && key!=sol.auxval
       txt*="$key = $val\n"
     end
   end
-  #TODO: soft-code residual symbol name
-  txt*="""
 
-  Residual:
-  abs(λ) = $(abs(sol.params[:λ]))"""
+  if sol.auxval in keys(sol.params)
+    txt*="""
+
+    Residual:
+    abs($(sol.auxval)) = $(abs(sol.params[sol.auxval]))
+    """
+  end
   return txt
 end
 function show(io::IO,sol::Solution)
@@ -324,8 +485,8 @@ function(L::LinearOperatorFamily)(args...;oplist=[],in_or_ex=false)
   coeff=spzeros(size(L.terms[1].coeff)...)  #TODO: improve this to handle more flexible matrices
 
   for term in L.terms
-    if (!in_or_ex && term.operator in oplist) || (in_or_ex && !(term.operator in oplist)) || (L.mode!=:householder && term.operator=="__aux__")
-    	continue
+    if (!in_or_ex && term.operator in oplist) || (in_or_ex && !(term.operator in oplist)) || (L.mode!=:householder && term.operator=="__aux__")  #TODO: consider deprecating this feature together with nicoud and picard
+      continue
     end
 
     #check whteher term is constant w.r.t. to some parameter then deriv is 0 thus continue
@@ -356,7 +517,7 @@ end
 #wrapper to perturbation theory
 #TODO: functional programming renders this obsolete, no?
 """
-  perturb!(sol::Solution,L::LinearOperatorFamily,param::Symbol,N::Int; <keyword arguments>)
+    perturb!(sol::Solution,L::LinearOperatorFamily,param::Symbol,N::Int; <keyword arguments>)
 
 Compute the `N`th order power series perturbation coefficients for the solution `sol` of the nonlineaer eigenvalue problem given by the operator family `L` with respect to the parameter `param`. The coefficients will be stored in the field `sol.eigval_pert` and `sol.v_pert` for the eigenvalue and the eignevector, respectively.
 
@@ -385,7 +546,7 @@ See also: [`perturb_fast!`](@ref)
  end
 
 """
-  perturb_fast!(sol::Solution,L::LinearOperatorFamily,param::Symbol,N::Int; <keyword arguments>)
+    perturb_fast!(sol::Solution,L::LinearOperatorFamily,param::Symbol,N::Int; <keyword arguments>)
 
 Compute the `N`th order power series perturbation coefficients for the solution `sol` of the nonlineaer eigenvalue problem given by the operator family `L` with respect to the parameter `param`. The coefficients will be stored in the field `sol.eigval_pert` and `sol.v_pert` for the eigenvalue and the eignevector, respectively.
 
@@ -413,8 +574,8 @@ See also: [`perturb!`](@ref)
    return
  end
 
- """
-   perturb_norm!(sol::Solution,L::LinearOperatorFamily,param::Symbol,N::Int; <keyword arguments>)
+"""
+    perturb_norm!(sol::Solution,L::LinearOperatorFamily,param::Symbol,N::Int; <keyword arguments>)
 
  Compute the `N`th order power series perturbation coefficients for the solution `sol` of the nonlineaer eigenvalue problem given by the operator family `L` with respect to the parameter `param`. The coefficients will be stored in the field `sol.eigval_pert` and `sol.v_pert` for the eigenvalue and the eignevector, respectively.
 
@@ -534,7 +695,7 @@ end
 
 #polyval(p,z)= sum(p.*(z.^(0:length(p)-1)))  #TODO: Although, this is not performance critical. Consider some performance aspects
 """
-    `f=polyval(p,z)`
+    f=polyval(p,z)
 Evaluate polynomial f(z)=∑_i p[i]z^1 at z, using Horner's scheme.
 """
 function polyval(p,z)

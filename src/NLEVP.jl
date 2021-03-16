@@ -6,12 +6,19 @@ include("NLEVP_exports.jl")
 #header
 using SparseArrays
 
-include("./algebra.jl")
-include("./LinOpFam.jl")
-include("./perturbation.jl")
-include("./Householder.jl")
-include("./beyn.jl")
-include("./toml.jl")
-include("./save.jl")
+include("./NLEVP/algebra.jl")
+include("./NLEVP/polys_pade.jl")
+include("./NLEVP/LinOpFam.jl")
+include("./NLEVP/perturbation.jl")
+include("./NLEVP/Householder.jl")
+include("./NLEVP/nicoud.jl")
+include("./NLEVP/picard.jl")
+include("./NLEVP/iterative_solvers.jl")
+#include("./NLEVP/mehrmann.jl")
+include("./NLEVP/beyn.jl")
+include("./NLEVP/solver.jl")
+include("./NLEVP/toml.jl")
+include("./NLEVP/save.jl")
+include("./NLEVP/gallery.jl")
 #using .TOML
 end

@@ -1,4 +1,4 @@
-include("../src/perturbation.jl")
+include("../src/NLEVP/perturbation.jl")
 println("Building WavesAndEigenvalues.jl...")
 
 if "JULIA_WAE_PERT_ORDER" in keys(ENV)
