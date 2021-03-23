@@ -2,7 +2,7 @@
     Network
 
 Tools for creating axial (i.e., 1d) thermoacoustic network models.
-The formulation is Riemann based:
+The formulation is Riemann-based:
 p=F exp(+iω*l/c)+G exp(-iω*l/c)
 Au=A/ρc[ F exp(+iω*l/c)-G exp(-iω*l/c)]
 """
@@ -13,11 +13,17 @@ include("NLEVP_exports.jl")
 
 
 """
-    out=duct(l,c,A,ρ)
+    out=duct(l,c,A,ρ=1.4*101325/c^2)
 
 Create local matrix coefficients for duct element.
+
+# Arguments
+- `l`: length of the duct
+- `c`: speed of sound
+- `A` cross-sectional area of the duct
+- `ρ` density
 """
-function duct(l,c,A,ρ)
+function duct(l,c,A,ρ=1.4*101325/c^2)
     M=[-1      -1;        #p_previous-p_current=0
         -A/(ρ*c) A/(ρ*c); #A u_previous-A u_current=0
         0          0;     #p_current-p_next=0
@@ -49,11 +55,22 @@ function duct(l,c,A,ρ)
 
     return out
 end
-duct(l,c,A)=duct(l,c,A,1.4*101325/c^2)
 
 
 
-function terminal(R,c,A,ρ;init=true)
+"""
+    out=terminal(R,c,A,ρ=1.4*101325/c^2;init=true)
+
+Create local matrix coefficients for terminal element.
+
+# Arguments
+- `R`: reflection coefficient
+- `c`: speed of sound
+- `A`: cross-sectional area of the terminal
+- `ρ`: density
+- `init`: (optional) if true its the left end else it is the right one.
+"""
+function terminal(R,c,A,ρ=1.4*101325/c^2;init=true)
     #if hasmethod(R,(ComplexF64,Int))
     if typeof(R)<:Number
     else
@@ -72,9 +89,19 @@ function terminal(R,c,A,ρ;init=true)
     end
     return [[M,(),()],]
 end
-terminal(R,c,A;init=init)=terminal(R,c,A,1.4*101325/c^2;init)
 
-function flame(c1,c2,A,ρ)
+"""
+    out=flame(c1,c2,A,ρ=1.4*101325/c1^2)
+
+Create local matrix coefficients for flame element with n-tau dynamics.
+
+# Arguments
+- `c1`: speed of sound on the unburnt side
+- `c2`: speed of sound on the burnt side
+- `A`: cross-sectional area of the terminal
+- `ρ`: density
+"""
+function flame(c1,c2,A,ρ=1.4*101325/c1^2)
     M= [0        0;
         0        0;
         0         0;
@@ -84,11 +111,31 @@ function flame(c1,c2,A,ρ)
     push!(out,[M*(c2^2/c1^2-1)*A/(ρ*c1), (pow1,exp_delay), ((:n,),(:ω,:τ),),])
     return out
 end
-flame(c1,c2,A)=flame(c1,c2,A,1.4*101325/c1^2)
 
-function helmholtz(V,l_n,d_n,c,A,ρ)
+"""
+    out=helmholtz(V,l_n,d_n,c,A,ρ=1.4*101325/c1^2)
+
+Create local matrix coefficients for a sidewall Helmholtz damper element.
+
+# Arguments
+- `V`: Volume of the damper
+- `l_n`: length of the damper neck
+- `d_n`: diameter of the damper neck
+- `c`: speed of sound
+- `A`: cross-sectional area of the terminal
+- `ρ`: density
+
+# Notes:
+
+The model is build on  the transfer matrix from [1]
+
+# References
+
+[1] F. P. Mechel, Formulas of Acoustic, Springer, 2004, p. 728
+"""
+function helmholtz(V,l_n,d_n,c,A,ρ=1.4*101325/c1^2)
     #=====
-    Transfer matrix from Mechel (Formulas of Acoustic p. 728):
+
     p_u=p_d
     u_u=1/Z p_d+u_d <==> A u_u=A/Z p_d+A u_d>
 
@@ -141,7 +188,7 @@ function helmholtz(V,l_n,d_n,c,A,ρ)
     function impedance(ω::ComplexF64,k::Int)::ComplexF64
         let ρ=ρ, r_n=r_n, r_u=r_u, M=M, c=c, l=l, V=V ,S_n=S_n
             return ρ*(pow2(ω,k)/(π*c)*(2-r_n/r_u)+pow0(ω,k)*0.425*M*c/S_n
-            +1.0im*pow1(ω,k)*l/S_n-1.0im-c^2/V*pow(ω,k,-1))
+            +1.0im*pow1(ω,k)*l/S_n-1.0im*c^2/V*pow(ω,k,-1))
         end
     end
     function admittance(ω::ComplexF64,k::Int)::ComplexF64
@@ -161,10 +208,10 @@ function helmholtz(V,l_n,d_n,c,A,ρ)
 
 
     out=duct(0,c,A,ρ)
-    push!(out,[M21*A, (admittance,), ((:ω,),),])
+    push!(out,[M21*A*(ρ*c), (admittance,), ((:ω,),),])
     #push!(out,[M22*A, (admittance,), ((:ω,),),])
 end
-helmholtz(V,l_n,d_n,c,A)=helmholtz(V,l_n,d_n,c,A,1.4*101325/c^2)
+
 
 
 """
@@ -191,12 +238,14 @@ For all elements the density `ρ` is an optional parameter which is computed
 as `ρ=1.4*101325/c^2` if unspecified (air at atmospheric pressure).
 
 # Example
-This is an example for the discretization of a Rijke tube.
+This is an example for the discretization of a Rijke tube, with a Helmholtz
+damper, a velocity node at the inlet and a pressure node at the outlet:
     network=[(:unode,(347.0, 0.01), ),
             (:duct,(0.25, 347.0, 0.01)),
             (:flame,(347,347*2,0.01)),
             (:duct,(0.25, 347.0*2, 0.01)),
             (:helmholtz,(0.02^3,0.01,.005,347*2,0.01)),
+            (:duct,(0.25, 347.0*2, 0.01)),
             (:pnode,(347.0*2, 0.01), )
             ]
 
