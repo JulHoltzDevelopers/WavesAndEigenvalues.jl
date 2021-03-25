@@ -21,14 +21,14 @@ The NLEVP lets you define NLEVPs and provides you with tools for finding
 accurate as well as perturbative solutions. The `using` statement brings all
 necessary tools into scope:
 
-```julia
+```@example tutorial_00_NLEVP
 using WavesAndEigenvalues.NLEVP
 ```
 
 Let's consider the quadratic eigenvalue problem  1 from the collection of NLEVPs [2].
 It reads `T(λ)= λ^2*A2 + λ*A1 + A0` where
 
-```julia
+```@example tutorial_00_NLEVP
 A2=[0 6 0;
     0 6 0;
     0 0 1];
@@ -45,19 +45,8 @@ nothing #hide
 
 We first need to instantiate an empty operator family.
 
-```julia
+```@example tutorial_00_NLEVP
 T=LinearOperatorFamily()
-```
-
-```
-empty operator family
-
-
-
-Parameters
-----------
-λ	NaN + NaN*im
-
 ```
 
 !!! tip
@@ -76,12 +65,8 @@ matrix.
 
 Ok, let's create the first term:
 
-```julia
+```@example tutorial_00_NLEVP
 term=Term(A2,(pow2,),((:λ,),),"A2")
-```
-
-```
-λ^2*A2
 ```
 
 Note, that the function `pow2` is provided by the NLEVP module. It computes
@@ -95,19 +80,8 @@ further explained in the next tutorials.
 
 Now, let's add the term to our family.
 
-```julia
+```@example tutorial_00_NLEVP
 T+=term
-```
-
-```
-3×3-dimensional operator family: 
-
-λ^2*A2
-
-Parameters
-----------
-λ	NaN + NaN*im
-
 ```
 
 It worked! The family is not empty anymore.
@@ -120,20 +94,9 @@ It worked! The family is not empty anymore.
 
 Let's also add the other two terms.
 
-```julia
+```@example tutorial_00_NLEVP
 T+=Term(A1,(pow1,),((:λ,),),"A1")
 T+=Term(A0,(),(),"A0")
-```
-
-```
-3×3-dimensional operator family: 
-
-λ^2*A2+λ*A1+A0
-
-Parameters
-----------
-λ	NaN + NaN*im
-
 ```
 
 Note that functions and arguments are empty in the last term because there is
@@ -144,29 +107,15 @@ The family is now a complete representation of our problem
 It is quite powerful. For instance, we can evaluate it at some point in the
 complex plane, say 3+2im:
 
-```julia
+```@example tutorial_00_NLEVP
 T(3+2im)
-```
-
-```
-3×3 Array{Complex{Float64},2}:
- 4.0+2.0im  12.0+60.0im  0.0+0.0im
- 6.0+4.0im  10.0+58.0im  0.0+0.0im
- 0.0+0.0im   0.0+0.0im   6.0+12.0im
 ```
 
 We can even take its derivatives. For instance, the second derivative at the
 same point is
 
-```julia
+```@example tutorial_00_NLEVP
 T(3+2im,2)
-```
-
-```
-3×3 Array{Complex{Float64},2}:
- 0.0+0.0im  12.0+0.0im  0.0+0.0im
- 0.0+0.0im  12.0+0.0im  0.0+0.0im
- 0.0+0.0im   0.0+0.0im  2.0+0.0im
 ```
 
 This syntax comes in handy when writing algorithms for the solution of the
@@ -187,36 +136,9 @@ a bit what is going on behind the scenes. The function will return a solution
 `sol` of type `Solution`, as well as the number of iterations `n` run and an
 error flag `flag`.
 
-```julia
+```@example tutorial_00_NLEVP
 sol,n,flag=mslp(T,0,output=true);
 nothing #hide
-```
-
-```
-Launching MSLP solver...
-Iter   dz:     z:
-----------------------------------
-0			Inf	0.0
-1			0.21976270357743133	0.2147594636259946 + 0.04662637308151951im
-2			0.08885531760332352	0.2993866118413472 + 0.019542923313732537im
-3			0.033202083130972414	0.3292202626020246 + 0.004971320569835911im
-4			0.006293004538713664	0.3333645192058974 + 0.0002356006324317284im
-5			0.00023769944078740377	0.33333366091326566 - 8.727546025417629e-8im
-6			3.390074774396457e-7	0.33333333333273524 + 3.430782475273895e-13im
-7			6.893955075745975e-13	0.3333333333333332 + 2.4613974855833593e-24im
-8			6.661338147750939e-16	0.33333333333333254 + 2.9321105043677363e-31im
-9			6.661338147750939e-16	0.3333333333333332 + 3.339320211059557e-31im
-10		6.661338147750932e-16	6.661338147750939e-16	0.33333333333333254 + 4.351492030582117e-31im
-Warning: Maximum number of iterations has been reached!
-...finished MSLP!
-#####################
- Results 
-#####################
-Number of steps: 10
-Last step parameter variation:6.661338147750939e-16
-Auxiliary eigenvalue __aux__ residual (rhs):6.661338147750932e-16
-Eigenvalue:0.33333333333333254 + 4.351492030582117e-31im
-
 ```
 
 The printed output tells us that the algorithm found 1/3 is an eigenvalue of
@@ -228,14 +150,9 @@ indicate warnings. In the current case the flag is `1`, so this is a warning.
 Therefore, the result can be true, but there is something we should be aware
 of.  Let's decode the error flag into something more readable.
 
-```julia
+```@example tutorial_00_NLEVP
 msg = decode_error_flag(flag)
 println(msg)
-```
-
-```
-Warning: Maximum number of iterations has been reached!
-
 ```
 
 As we already knew, the iteration aborted because the maximum number of
@@ -249,32 +166,9 @@ eigenvalue is not significantly changing anymore after 6 iterations. Let's
 redo the calculations, with a small but non-zero tolerance by setting the
 optional `tol` keyword.
 
-```julia
+```@example tutorial_00_NLEVP
 sol,n,flag=mslp(T,0,tol=1E-10,output=true);
 nothing #hide
-```
-
-```
-Launching MSLP solver...
-Iter   dz:     z:
-----------------------------------
-0			Inf	0.0
-1			0.3091753342130375	0.3084490799844025 - 0.02117905433486341im
-2			0.028554443587410515	0.3316559062828601 - 0.004541763036703544im
-3			0.004788776681260656	0.33343303494632615 - 9.494441925653792e-5im
-4			0.00013775902065808008	0.33333332790060327 + 1.1373560610378447e-7im
-5			1.1386527920077728e-7	0.33333333333341086 + 7.414843609558661e-15im
-6		7.762646518664894e-14	7.762646518663691e-14	0.3333333333333336 - 6.811025055678216e-27im
-Solution has converged!
-...finished MSLP!
-#####################
- Results 
-#####################
-Number of steps: 6
-Last step parameter variation:7.762646518663691e-14
-Auxiliary eigenvalue __aux__ residual (rhs):7.762646518664894e-14
-Eigenvalue:0.3333333333333336 - 6.811025055678216e-27im
-
 ```
 
 Boom! The iteration stops after 6 iterations and indicates that an
@@ -283,15 +177,9 @@ eigenvalue has been found.
 We may also inspect the corresponding left and right eigenvector. They are
 fields in the solution object:
 
-```julia
+```@example tutorial_00_NLEVP
 println(sol.v)
 println(sol.v_adj)
-```
-
-```
-Complex{Float64}[-0.2893267018214533 + 0.6452054398508432im, -0.2893267018214534 + 0.6452054398508428im, 1.2325951644078312e-32 - 6.162975822039156e-33im]
-Complex{Float64}[-0.5786534036430183 + 1.2904108797020055im, 1.1573068072859303 - 2.5808217594036975im, -1.3382229383269777e-43 + 8.938109037958203e-44im]
-
 ```
 
 There are more iterative solvers. Not all of them solve the complete problem.
@@ -305,86 +193,33 @@ Let's briefly test them all...
 
 This algorithm finds an eigenvalue and a corresponding right eigenvector
 
-```julia
+```@example tutorial_00_NLEVP
 sol,n,flag=inveriter(T, 0, tol=1E-10, output=true);
 nothing #hide
-```
-
-```
-Launching inverse iteration...
-0		Inf	0
-1		0.30000000000000004	0.30000000000000004 + 0.0im
-2		0.028571428571428137	0.3285714285714282 + 0.0im
-3		0.00463320463320499	0.33320463320463317 + 0.0im
-4		0.00012860089961053145	0.3333332341042437 + 0.0im
-5		9.922903054793153e-8	0.33333333333327425 + 0.0im
-6		5.950795411990839e-14	0.33333333333333376 + 0.0im
-Solution has converged!
-
 ```
 
 ### trace iteration
 This algorithm only finds an eigenvalue
 
-```julia
+```@example tutorial_00_NLEVP
 sol,n,flag=traceiter(T, 0, tol=1E-10, output=true);
 nothing #hide
-```
-
-```
-Launching trace iteration...
-0		Inf	0
-1		0.16666666666666666	0.16666666666666666 + 0.0im
-2		0.10125889436234267	0.26792556102900933 + 0.0im
-3		0.04886705474089864	0.31679261576990797 + 0.0im
-4		0.014969376489607611	0.3317619922595156 + 0.0im
-5		0.0015546254085949673	0.33331661766811055 + 0.0im
-6		1.6713737663487382e-5	0.33333333140577404 + 0.0im
-7		1.927559389880429e-9	0.3333333333333334 + 0.0im
-8		2.220446049250313e-16	0.3333333333333332 + 0.0im
-Solution has converged!
-
 ```
 
 ### Lancaster's generalized Rayleigh quotient iteration
 This algorithm only finds an eigenvalue
 
-```julia
+```@example tutorial_00_NLEVP
 sol,n,flag=lancaster(T, 0, tol=1E-10, output=true);
 nothing #hide
-```
-
-```
-Launching Lancaster's Rayleigh-quotient iteration...
-0		Inf	0
-1		0.30000000000000004	0.30000000000000004 + 0.0im
-2		0.029104073704340316	0.32910407370434036 + 0.0im
-3		0.004135217444984907	0.33323929114932527 + 0.0im
-4		9.399316044850226e-5	0.33333328430977377 + 0.0im
-5		4.902354600044845e-8	0.33333333333331977 + 0.0im
-6		1.354472090042691e-14	0.3333333333333333 + 0.0im
-Solution has converged!
-
 ```
 
 ### two-sided Rayleigh-functional iteration
 This algorithm finds a complete eigentriple.
 
-```julia
+```@example tutorial_00_NLEVP
 sol,n,flag=rf2s(T, 0, tol=1E-10, output=true);
 nothing #hide
-```
-
-```
-Launching two-sided Rayleigh functional iteration...
-0		Inf	0
-1		0.23434529628710668	0.23434529628710668 - 0.0im
-2		0.09576672895627122	0.3301120252433779 - 0.0im
-3		0.0032212122529545195	0.3333332374963324 - 0.0im
-4		9.583700116833072e-8	0.3333333333333336 - 0.0im
-5		NaN	NaN + NaN*im
-Warning: computer arithmetics problem. Eigenvalue is NaN
-
 ```
 
 Oops, this last test produced a NaN value. The problem often occurs when
@@ -392,21 +227,9 @@ the eigenvalue and one point in the iteration is too precise. (See how in the
 last-but-one iteration we've been already damn close to 1/3). Choosing a
 slightly different initial guess often leverages the problem:
 
-```julia
+```@example tutorial_00_NLEVP
 sol,n,flag=rf2s(T, 0, tol=1E-10, output=true);
 nothing #hide
-```
-
-```
-Launching two-sided Rayleigh functional iteration...
-0		Inf	0
-1		0.23434529628710668	0.23434529628710668 - 0.0im
-2		0.09576672895627122	0.3301120252433779 - 0.0im
-3		0.0032212122529545195	0.3333332374963324 - 0.0im
-4		9.583700116833072e-8	0.3333333333333336 - 0.0im
-5		NaN	NaN + NaN*im
-Warning: computer arithmetics problem. Eigenvalue is NaN
-
 ```
 
 ## Beyn's integration-based solver
@@ -425,7 +248,7 @@ Let's test Beyn's algorithm on our example problem by searching for all
 eigenvalues inside the axis-parallel square spanning from `-2-2im` to `2+2im`.
 The vertices of this contour are:
 
-```julia
+```@example tutorial_00_NLEVP
 Γ=[2+2im, -2+2im, -2-2im, +2-2im];
 nothing #hide
 ```
@@ -446,17 +269,9 @@ that it has 6 eigenvalues. Not all of them must lie in our contour, however
 this upper bound is a safe guess for our contour. We use the optional keyword
 `l=6` to pass this information to the algorithm. The call then is:
 
-```julia
+```@example tutorial_00_NLEVP
 Λ,V=beyn(T,Γ,l=6, output=true);
 nothing #hide
-```
-
-```
-Beyn...  27%|████████                      |  ETA: 0:00:02Beyn... 100%|██████████████████████████████| Time: 0:00:00
-############
-singular values:
-[14.426760137347847, 6.283184515316616, 6.283184515316615, 3.4297851239318184, 0.6821925100199037, 1.4050439819523788e-15]
-
 ```
 
 Note the printed information on singular values. One step in Beyn's algorithm
@@ -476,23 +291,13 @@ it should be. Because the computation is carried out on a computer the
 eigenpairs won't evaluate to the zero vector but have some residual. We can
 use this as a quality check. The computation of the residual norms yields:
 
-```julia
+```@example tutorial_00_NLEVP
 for (idx,λ) in enumerate(Λ)
    v=V[:,idx]
    v/=sqrt(v'*v)
    res=T(λ)*v
    println("λ=$λ residual norm: $(abs(sqrt(res'*res)))")
 end
-```
-
-```
-λ=-3.0046846037705304e-16 + 1.0000000000000002im residual norm: 3.2378127103262535e-15
-λ=1.9081958235744878e-16 - 0.9999999999999998im residual norm: 1.9230280355021297e-15
-λ=0.16554342477066233 - 1.0271955541799844im residual norm: 3.8796425923748163
-λ=0.33333333333333576 + 6.677193806922799e-16im residual norm: 2.1182915745378617e-15
-λ=0.49999999999999545 - 1.0637329323545343e-15im residual norm: 2.528153131782494e-15
-λ=1.000000000000001 - 1.5080235779736662e-16im residual norm: 6.476979535860806e-15
-
 ```
 
 We clearly see that out of the 6 eigenvalues 5 have extremely low residuals.
@@ -506,12 +311,8 @@ iterative solver.
 Please, note that you could also compute the number of poles and zeros inside the contour from
 the residual theorem with the following command:
 
-```julia
+```@example tutorial_00_NLEVP
 number=count_poles_and_zeros(T,Γ)
-```
-
-```
-4.999999621784568 - 3.092205940311753e-17im
 ```
 
 The functions sums up the number of poles and zeros of the determinant of `T`

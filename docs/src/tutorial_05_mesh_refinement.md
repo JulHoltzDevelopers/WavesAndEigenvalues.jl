@@ -17,7 +17,7 @@ splitting such that the maximum of the newly created edges is minimized.
 
 We start with initializing the standard Rijke-Tube example.
 
-```julia
+```@example tutorial_05_mesh_refinement
 using WavesAndEigenvalues.Helmholtz
 mesh=Mesh("Rijke_mm.msh",scale=0.001)
 dscrp=Dict() #initialize model descriptor
@@ -47,55 +47,16 @@ data["phase"]=angle.(sol.v)
 vtk_write("test", mesh, data) # Write the solution to paraview
 ```
 
-```
-Launching Householder...
-Iter    Res:     dz:     z:
-----------------------------------
-0		Inf	Inf	2513.2741228718346
-1		3.3678010621821997e6	672.6717790631509	1840.644381094955 + 7.520161245130288im
-2		457309.5623269443	125.32039552244363	1715.3398137797765 + 9.511880065048567im
-3		15754.920293139632	4.636826536115793	1710.7041295613465 + 9.614798251130926im
-4		21.537680317163897	0.006356125798411251	1710.6977772512585 + 9.615018459466514im
-5		4.045803703302238e-5	1.1939919720254716e-8	1710.6977772393393 + 9.615018460170372im
-6		2.6334860638026723e-8	7.85077700900375e-12	1710.6977772393466 + 9.61501846017332im
-7		1.4995064722670382e-8	4.324048085871753e-12	1710.6977772393423 + 9.615018460173136im
-8		1.0838615959911618e-8	3.1913416131870233e-12	1710.697777239339 + 9.615018460173363im
-9		1.4098455247391106e-8	4.099642246569255e-12	1710.6977772393432 + 9.615018460173125im
-10		1.919724130587623e-9	4.655004020764636e-13	1710.6977772393427 + 9.615018460173225im
-Warning: Maximum number of iterations has been reached!
-...finished Householder!
-#####################
- Householder results 
-#####################
-Number of steps: 10
-Last step parameter variation:4.655004020764636e-13
-Auxiliary eigenvalue λ residual (rhs):1.919724130587623e-9
-Eigenvalue:1710.6977772393427 + 9.615018460173225im
-Eigenvalue/(2*pi):272.26600738395945 + 1.5302777158563927im
-
-```
-
 ## refine mesh
 Now let's call `octosplit` for creating the refined mesh
 
-```julia
+```@example tutorial_05_mesh_refinement
 fine_mesh=octosplit(mesh)
-```
-
-```
-mesh: Rijke_mm.msh
-#################
-points:     6172
-lines:      0
-triangles:  6248
-tetrahedra: 27040
-#################
-domains: Cold, Flame, Flame_in, Flame_out, Hot, Inlet, Interior, Outlet, Walls
 ```
 
 and solve the problem again with the fine mesh for comparison.
 
-```julia
+```@example tutorial_05_mesh_refinement
 c=generate_field(fine_mesh,speedofsound)
 L=discretize(fine_mesh,dscrp,c)
 sol,nn,flag=householder(L,400*2*pi,maxiter=10)
@@ -108,17 +69,6 @@ vtk_write("fine_test", fine_mesh, data) # Write the solution to paraview
 
 # If you think that's not enough, well, then try...
 fine_mesh=octosplit(fine_mesh)
-```
-
-```
-mesh: Rijke_mm.msh
-#################
-points:     42507
-lines:      0
-triangles:  24992
-tetrahedra: 216320
-#################
-domains: Cold, Flame, Flame_in, Flame_out, Hot, Inlet, Interior, Outlet, Walls
 ```
 
 ## Summary

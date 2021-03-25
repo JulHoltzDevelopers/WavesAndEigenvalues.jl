@@ -45,14 +45,15 @@ L=discretize(mesh,dscrp,c, order=:quad)
 All subsequent steps are the same. For instance, solving for an eigenvalue is done by
 
 ```@example tutorial_06_second_order_elements
-sol,nn,flag=mslp(L,340*2*pi,maxiter=20,tol=1E-11)
+sol,nn,flag=mslp(L,340*2*pi,maxiter=20,tol=1E-11,output=true)
+#
 ```
 
 And writing output to paraview by
 
 ```@example tutorial_06_second_order_elements
 data=Dict()
-data["abs mode"]=abs.(sol.v).
+data["abs mode"]=abs.(sol.v)
 vtk_write("tutorial06",mesh, data)
 ```
 

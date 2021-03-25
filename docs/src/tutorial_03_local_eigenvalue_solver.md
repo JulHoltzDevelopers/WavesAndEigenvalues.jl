@@ -13,7 +13,7 @@ closely follows the considerations in [2].
 ## Model set-up.
 The model is the same Rijke tube configuration as in Tutorial 01:
 
-```julia
+```@example tutorial_03_local_eigenvalue_solver
 using WavesAndEigenvalues.Helmholtz
 mesh=Mesh("Rijke_mm.msh",scale=0.001) #load mesh
 dscrp=Dict() #initialize model descriptor
@@ -37,21 +37,6 @@ c=generate_field(mesh,speedofsound)
 L=discretize(mesh,dscrp,c)
 ```
 
-```
-1006×1006-dimensional operator family: 
-
-ω^2*M+K+n*exp(-iωτ)*Q+ω*Y*C
-
-Parameters
-----------
-n	0.01 + 0.0im
-λ	Inf + 0.0im
-ω	0.0 + 0.0im
-τ	0.001 + 0.0im
-Y	1.0e15 + 0.0im
-
-```
-
 ## The local solver
 
 The key idea behind the local solver is simple: The eigenvalue problem
@@ -71,22 +56,9 @@ the local-solver `mslp` allows the user to control the solution process.
 Mandatory input arguments are only the linear operator family `L` and an
 initial guess `z` for the eigenvalue `ω`` iteration.
 
-```julia
+```@example tutorial_03_local_eigenvalue_solver
 z=300.0*2*pi
 sol,nn,flag = mslp(L, z)
-```
-
-```
-(####Solution####
-eigval:
-ω = 1710.69777723934 + 9.61501846017335im
-
-Parameters:
-n = 0.01 + 0.0im
-λ = 1.031036435632696e-8 + 5.386760588610906e-10im
-τ = 0.001 + 0.0im
-Y = 1.0e15 + 0.0im
-, 10, 1)
 ```
 
 ## Maximum iterations
@@ -95,21 +67,8 @@ As per default five iterations are performed. This iteration number can be
 customized using the keyword `maxiter` For instance the following command
 runs 30 iterations
 
-```julia
+```@example tutorial_03_local_eigenvalue_solver
 sol,nn,flag = mslp(L, z, maxiter=30)
-```
-
-```
-(####Solution####
-eigval:
-ω = 1710.6977772393425 + 9.615018460173417im
-
-Parameters:
-n = 0.01 + 0.0im
-λ = 1.1058932625637208e-9 - 2.9019411781324465e-11im
-τ = 0.001 + 0.0im
-Y = 1.0e15 + 0.0im
-, 30, 1)
 ```
 
 # A stopping crtierion
@@ -122,21 +81,8 @@ terminated. This keyword defaults to `tol=0.0` and, thus, `maxiter` iterations
 will be performed. However, it is highly recommended to set the parameter to
 some positive value whenever possible.
 
-```julia
+```@example tutorial_03_local_eigenvalue_solver
 sol,nn,flag = mslp(L, z, maxiter=30, tol=1E-10)
-```
-
-```
-(####Solution####
-eigval:
-ω = 1710.6977772393418 + 9.615018460170836im
-
-Parameters:
-n = 0.01 + 0.0im
-λ = 7.344557969393061e-8 + 2.3398225911910384e-9im
-τ = 0.001 + 0.0im
-Y = 1.0e15 + 0.0im
-, 5, 0)
 ```
 
 Note that the tolerance is also a bound for the error associated with the
@@ -156,21 +102,8 @@ terminated iterations you can specify another tolerance `lam_tol`. If
 feature only makes sense when a termination threshold has been specified.
 As in the following example:
 
-```julia
+```@example tutorial_03_local_eigenvalue_solver
 sol,nn,flag = mslp(L, z, maxiter=30, tol=1E-10, lam_tol=1E-8)
-```
-
-```
-(####Solution####
-eigval:
-ω = 1710.6977772393418 + 9.615018460170836im
-
-Parameters:
-n = 0.01 + 0.0im
-λ = 7.344557969393061e-8 + 2.3398225911910384e-9im
-τ = 0.001 + 0.0im
-Y = 1.0e15 + 0.0im
-, 5, 2)
 ```
 
 ## Faster convergence
@@ -179,21 +112,8 @@ computed. You high-order perturbation theory to improve the
 iteration via the `order` keyword. For instance, third-order theory is used
 in this example
 
-```julia
+```@example tutorial_03_local_eigenvalue_solver
 sol,nn,flag = mslp(L, z, maxiter=30, tol=1E-10, lam_tol=1E-8, order=3)
-```
-
-```
-(####Solution####
-eigval:
-ω = 1710.6977772393466 + 9.615018460173351im
-
-Parameters:
-n = 0.01 + 0.0im
-λ = -1.7829967501986358e-8 + 2.73112255541197e-8im
-τ = 0.001 + 0.0im
-Y = 1.0e15 + 0.0im
-, 3, 2)
 ```
 
 Under the hood the routine calls ARPACK to utilize Arnoldi's method to solve
@@ -203,21 +123,8 @@ but via the `nev` keyword the number can be increased. This results
 in an increased computation time but provides more candidates for the next
 iteration, potentially improving the convergence.
 
-```julia
+```@example tutorial_03_local_eigenvalue_solver
 sol,nn,flag = mslp(L, z, maxiter=30, tol=1E-10, lam_tol=1E-8, nev=3)
-```
-
-```
-(####Solution####
-eigval:
-ω = 1710.6977772393418 + 9.615018460170836im
-
-Parameters:
-n = 0.01 + 0.0im
-λ = 7.344557969393061e-8 + 2.3398225911910384e-9im
-τ = 0.001 + 0.0im
-Y = 1.0e15 + 0.0im
-, 5, 2)
 ```
 
 ## Summary

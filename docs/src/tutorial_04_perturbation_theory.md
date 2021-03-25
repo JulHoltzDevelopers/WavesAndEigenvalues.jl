@@ -357,7 +357,7 @@ clever person named r the radius of *convergence*. Beyond that radius we cannot
 make the Taylor-series converge without shifting the expansion point. You might
 think: "*Well, then let's shift the expansion point!*" While this is definitely
 a valid approach, there is something better you can do...
-## Series accelartion by Padé approximation
+## Series accelaration by Padé approximation
 
 The Taylor-series cannot converge beyond its radius of convergence. So why
 not trying something else than a Taylor-series? The truncated Taylor series is
