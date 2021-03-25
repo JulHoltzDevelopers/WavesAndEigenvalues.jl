@@ -23,6 +23,8 @@ makedocs(format = Documenter.HTML(
                         "tutorial_04_perturbation_theory.md",
                         "tutorial_05_mesh_refinement.md",
                         "tutorial_06_second_order_elements.md",
+                        "tutorial_07_Bloch_periodicity.md",
+                        "tutorial_08_custom_FTF.md",
                         ],
         "API" => Any["NLEVP.md","Meshutils.md", "Helmholtz.md"]
         ]
