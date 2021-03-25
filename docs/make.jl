@@ -1,9 +1,8 @@
 path=pwd()
 
 ##
-
+import Pkg; Pkg.add("Documenter")
 using Documenter
-import Pkg
 Pkg.activate(".")
 using WavesAndEigenvalues
 ##
