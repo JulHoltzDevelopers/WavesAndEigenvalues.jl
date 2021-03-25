@@ -1,4 +1,5 @@
 path=pwd()
+import Pkg
 Pkg.activate(".")
 ##
 
