@@ -27,3 +27,8 @@ makedocs(format = Documenter.HTML(
         ]
         )
 cd(path)
+
+deploydocs(
+    repo = "github.com/JulHoltzDevelopers/WavesAndEigenvalues.jl.git",
+    push_preview=true
+    )
