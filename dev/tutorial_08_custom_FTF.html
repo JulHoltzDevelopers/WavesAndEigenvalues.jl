@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Tutorial 08 Custom FTF · WavesAndEigenvalues.jl</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">WavesAndEigenvalues.jl</span></div><form class="docs-search" action="search.html"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="index.html">Home</a></li><li><a class="tocitem" href="installation.html">Install</a></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="tutorial_00_NLEVP.html">Tutorial 00 Introduction to the NLEVP module</a></li><li><a class="tocitem" href="tutorial_01_rijke_tube.html">Tutorial 01 Rijke Tube</a></li><li><a class="tocitem" href="tutorial_02_global_eigenvalue_solver.html">Tutorial 02 Beyn&#39;s Global Eigenvalue Solver</a></li><li><a class="tocitem" href="tutorial_03_local_eigenvalue_solver.html">Tutorial 03  A Local Eigenvalue Solver</a></li><li><a class="tocitem" href="tutorial_04_perturbation_theory.html">Tutorial 04 Perturbation Theory</a></li><li><a class="tocitem" href="tutorial_05_mesh_refinement.html">Tutorial 05 Mesh Refinement</a></li><li><a class="tocitem" href="tutorial_06_second_order_elements.html">Tutorial 06 Second Order Elements</a></li></ul></li><li><span class="tocitem">API</span><ul><li><a class="tocitem" href="NLEVP.html">The NLEVP module</a></li><li><a class="tocitem" href="Meshutils.html">The Meshutils module</a></li><li><a class="tocitem" href="Helmholtz.html">The Helmholtz module</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href="tutorial_08_custom_FTF.html">Tutorial 08 Custom FTF</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="tutorial_08_custom_FTF.html">Tutorial 08 Custom FTF</a></li></ul></nav><div class="docs-right"><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Tutorial-08-Custom-FTF"><a class="docs-heading-anchor" href="#Tutorial-08-Custom-FTF">Tutorial 08 Custom FTF</a><a id="Tutorial-08-Custom-FTF-1"></a><a class="docs-heading-anchor-permalink" href="#Tutorial-08-Custom-FTF" title="Permalink"></a></h1><p>The typical use case for thermoacoustic stability assessment will require case-speicific data. e.g, measured impedance functions or flame transfer functions. This tutorial explains how to specify custom functions in order to include them in your model.</p><h2 id="Model-set-up"><a class="docs-heading-anchor" href="#Model-set-up">Model set-up</a><a id="Model-set-up-1"></a><a class="docs-heading-anchor-permalink" href="#Model-set-up" title="Permalink"></a></h2><p>The model is the same Rijke tube configuration as in Tutorial 01. However, this time the FTF is customly defined. Let&#39;s start with the definition of the flame transfer function. The custom function must return the FTF and all its derivatives w.r.t. the complex freqeuncy. Therefore, the interface <strong>must</strong> be a function with two inputs: a complex number and an integer. For an n-τ-model it reads.</p><pre><code class="language-julia">function FTF(ω::ComplexF64, k::Int=0)::ComplexF64
+    return n*(-1.0im*τ)^k*exp(-1.0im*ω*τ)
+end</code></pre><pre class="documenter-example-output">FTF (generic function with 2 methods)</pre><div class="admonition is-info"><header class="admonition-header">Note</header><div class="admonition-body"><p><code>n</code> and <code>τ</code> aren&#39;t defined yet, but Julia is a quite generous programming language; it won&#39;t complain if we define them before making our first call to the function.</p></div></div><p>Of course, it is sometimes hard to find a closed-form expression for an FTF and all its derivatives. You need to specify at least these derivative orders that will be used by the methods applied to analyse the model. This is at least the first order derivative for beyn and the standard mslp method. You might return derivative orders up to the order you need it using an if clause for each order. Anyway, the function may get complicated. The implicit method explained further below is then a viable alternative.</p><p>For convenience we can also specify a display signature, that is used to nicely display our function when the discretized model is displayed in the REPL. Let&#39;s say in our case we want the function to be named <code>&quot;ntau(z)&quot;</code> where <code>&quot;z&quot;</code> is a placeholder for whatever the name of the argument will be. We achieve this by adding a method to our FTF function that takes a symbol as input and returns a string.</p><pre><code class="language-julia">function FTF(z::Symbol)::String
+    return &quot;ntau($z)&quot;
+end</code></pre><pre class="documenter-example-output">FTF (generic function with 3 methods)</pre><p>Now let&#39;s set-up the Rijke tube model. The data is the same as in tutorial 1</p><pre><code class="language-julia">using WavesAndEigenvalues.Helmholtz
+mesh=Mesh(&quot;Rijke_mm.msh&quot;,scale=0.001) #load mesh
+dscrp=Dict() #initialize model descriptor
+dscrp[&quot;Interior&quot;]=(:interior, ()) #define resonant cavity
+dscrp[&quot;Outlet&quot;]=(:admittance, (:Y,1E15)) #specify outlet BC
+γ=1.4 #ratio of specific heats
+ρ=1.225 #density at the reference location upstream to the flame in kg/m^3
+Tu=300.0    #K unburnt gas temperature
+Tb=1200.0    #K burnt gas temperature
+P0=101325.0 # ambient pressure in Pa
+A=pi*0.025^2 # cross sectional area of the tube
+Q02U0=P0*(Tb/Tu-1)*A*γ/(γ-1) #the ratio of mean heat release to mean velocity Q02U0
+x_ref=[0.0; 0.0; -0.00101] #reference point
+n_ref=[0.0; 0.0; 1.00] #directional unit vector of reference velocity
+R=287.05 # J/(kg*K) specific gas constant (air)
+speedofsound(x,y,z) = z&lt;0. ? sqrt(γ*R*Tu) : sqrt(γ*R*Tb)
+c=generate_field(mesh,speedofsound)</code></pre><pre class="documenter-example-output">3380-element Array{Float64,1}:
+ 694.4379021914054
+ 694.4379021914054
+ 694.4379021914054
+ 694.4379021914054
+ 694.4379021914054
+ 694.4379021914054
+ 694.4379021914054
+ 694.4379021914054
+ 694.4379021914054
+ 694.4379021914054
+   ⋮
+ 347.2189510957027
+ 347.2189510957027
+ 347.2189510957027
+ 347.2189510957027
+ 347.2189510957027
+ 347.2189510957027
+ 347.2189510957027
+ 347.2189510957027
+ 347.2189510957027</pre><p>btw this is the moment where we specify the values of n and τ</p><pre><code class="language-julia">n=1 #interaction index
+τ=0.001 #time delay
+
+#</code></pre><p>but instead of passing n and τ and its values to the flame description we just pass the FTF</p><pre><code class="language-julia">dscrp[&quot;Flame&quot;]=(:flame,(γ,ρ,Q02U0,x_ref,n_ref,FTF)) #flame dynamics
+
+#... discretize ...
+L=discretize(mesh,dscrp,c)</code></pre><pre class="documenter-example-output">1006×1006-dimensional operator family: 
+
+ω^2*M+K+ntau(ω)*Q+ω*Y*C
+
+Parameters
+----------
+λ	Inf + 0.0im
+ω	0.0 + 0.0im
+Y	1.0e15 + 0.0im
+</pre><p>and done! Note how the function is currectly displayed as &quot;natu(ω)&quot;  if we wouldn&#39;t have named it, the FTF will be displayed as <code>&quot;FTF(ω)&quot;</code> in the signature of the operator.</p><h2 id="Checking-the-model"><a class="docs-heading-anchor" href="#Checking-the-model">Checking the model</a><a id="Checking-the-model-1"></a><a class="docs-heading-anchor-permalink" href="#Checking-the-model" title="Permalink"></a></h2><p>Solving the problem shows that we get the same result as with the built-in n-τ-model in Tutorial 1</p><pre><code class="language-julia">sol,nn,flag=mslp(L,340,maxiter=20,tol=1E-9,scale=2*pi)
+# changing the parameters</code></pre><pre class="documenter-example-output">Launching MSLP solver...
+scale: 6.283185307179586
+Iter   dz:     z:
+----------------------------------
+0			Inf	340.0
+1			121.73944539642724	218.8954344765888 + 12.416794063505094im
+2			59.03920596186603	171.84143313726085 + 48.075576972715im
+3			11.172355692677408	170.75031345770205 + 59.19452429557703im
+4			0.3944514828712027	171.14381739654743 + 59.2218486885704im
+5			0.0004947274139142701	171.14332284343598 + 59.22183555715669im
+6		1.1691665198048127e-5	4.880169392400843e-9	1075.3252115068974 + 372.10176703721584im
+Solution has converged!
+...finished MSLP!
+#####################
+ Results
+#####################
+Number of steps: 6
+Last step parameter variation:4.880169392400843e-9
+Auxiliary eigenvalue λ residual (rhs):1.1691665198048127e-5
+Eigenvalue:171.14332284266058 + 59.221835557201786im</pre><p>Because the system parameters n and τ are defined in this outer scope, changing them will change the FTF and thus the model without rediscretization. For instance, you can completely deactivate the FTF by setting n to 0.</p><pre><code class="language-julia">n=0</code></pre><pre class="documenter-example-output">0</pre><p>Indeed the model now converges to purely acoustic mode</p><pre><code class="language-julia">sol,nn,flag=mslp(L,340*2*pi,maxiter=20,tol=1E-11)</code></pre><pre class="documenter-example-output">(####Solution####
+eigval:
+ω = 1709.429929657814 + 6.990634427877916e-13im
+
+Parameters:
+λ = 3.879158853133288e-9 + 5.058060765172243e-22im
+Y = 1.0e15 + 0.0im
+, 5, 0)</pre><p>However, be aware that there is currently no mechanism keeping track of these parameters. It is the programmer&#39;s (that&#39;s you) responsibility to know the specification of the FTF when <code>sol</code> was computed.</p><p>Also, note the parameters are defined in this scope. You cannot change it by iterating it in a for-loop or from within a function, due to julia&#39;s scoping rules.</p><pre><code class="language-julia"># Something else than n-τ...</code></pre><p>Of course this is an academic example. In practice you will specify something very custom as FTF. Maybe a superposition of σ-τ-models or even a statespace model fitted to experimental data.</p><p>A faily generic way of handling was intoduced in [1]. This approach is not considering a specific FTF but parametrizes the problem in terms of the flame response. Using perturbation theory it is than possible to get the frequency as a function of the flame response. Closing the system with a specific FTF is than possible, and the eigenfrequency is found by solving a scalar equation! Here is a demonstration on how that works:</p><pre><code class="language-julia">dscrp[&quot;Flame&quot;]=(:flame,(γ,ρ,Q02U0,x_ref,n_ref)) #no flame dynamics specified at all
+H=discretize(mesh,dscrp,c)
+η0=0
+H.params[:FTF]=η0
+sol_base,nn,flag=mslp(H,340*2*pi,maxiter=20,tol=1E-11)</code></pre><pre class="documenter-example-output">(####Solution####
+eigval:
+ω = 1709.429929657814 + 6.990634427877916e-13im
+
+Parameters:
+λ = 3.879158853133288e-9 + 5.058060765172243e-22im
+Y = 1.0e15 + 0.0im
+FTF = 0.0 + 0.0im
+, 5, 0)</pre><p>The model H has no flame transfer function, but the flame response appears as a parameter <code>:FTF</code>. We set this parameter to 0 and solved the model, i.e. we computed a possive solution.  This solution will serve as a baseline. Note, that it is not necessary to use a passive solution as baseline, a nonzero baseline flame response would also work. Anyway, the baseline solution is used to build a XX-order pade-approximation. For convenience we import some tools to handle the algebra.</p><pre><code class="language-">#
+using WavesAndEigenvalues.Helmholtz.NLEVP.Pade: Polynomial, Rational_Polynomial, prodrange, pade
+#
+perturb_fast!(sol_base,H,:FTF,32)
+#
+func=pade(Polynomial(sol_base.eigval_pert[Symbol(&quot;FTF/Taylor&quot;)]),15,15)
+ω(z,k=0)=func(z-η0,k)
+#</code></pre><h2 id="Newton-Raphson-for-finding-flame-response"><a class="docs-heading-anchor" href="#Newton-Raphson-for-finding-flame-response">Newton-Raphson for finding flame response</a><a id="Newton-Raphson-for-finding-flame-response-1"></a><a class="docs-heading-anchor-permalink" href="#Newton-Raphson-for-finding-flame-response" title="Permalink"></a></h2><p class="math-container">\[\eta = FTF(\omega(\Delta\eta)}-\eta_0\]</p><p>From Newton-Raphson we find</p><p>Δη<em>{k+1}=Δη</em>{k+1}-\frac{FTF(ω(Δη<em>k)}-Δη</em>k}{FTF&#39;(ω(Δη<em>k)}ω&#39;&#39;(Δη</em>k)-Δη_k-1}</p><pre><code class="language-">#
+n=1
+τ=0.001
+η=sol_base.params[:FTF]
+for ii=1:10
+    global omeg,η
+    omeg=ω(η)
+    η-=(FTF(omeg)-η)/(FTF(omeg,1)*ω(η,1)-1)
+    println(ii,&quot;:&quot;,η)
+end
+println(ω(η)/2pi,&quot; η :&quot;,η,&quot; Res:&quot;,FTF(omeg)-η)
+#
+sol_exact,nn,flag=mslp(L,ω(η)/2pi,maxiter=20,tol=1E-11,output=false) #solve again
+ω_exact=sol_exact.params[:ω]
+println(&quot; exact=$(ω_exact/2/pi)  vs  approx=$(ω(η)/2pi))&quot;)
+#</code></pre><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 25 March 2021 13:13">Thursday 25 March 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

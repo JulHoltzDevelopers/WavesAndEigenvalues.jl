@@ -49,15 +49,25 @@ n	0.01 + 0.0im
 ω	0.0 + 0.0im
 τ	0.001 + 0.0im
 Y	1.0e15 + 0.0im
-</pre><p>All subsequent steps are the same. For instance, solving for an eigenvalue is done by</p><pre><code class="language-julia">sol,nn,flag=mslp(L,340*2*pi,maxiter=20,tol=1E-11)</code></pre><pre class="documenter-example-output">(####Solution####
-eigval:
-ω = 1710.3900506856144 + 9.73287001434386im
-
-Parameters:
-n = 0.01 + 0.0im
-λ = -3.155353685043612e-8 - 3.2059033574539113e-10im
-τ = 0.001 + 0.0im
-Y = 1.0e15 + 0.0im
-, 6, 0)</pre><p>And writing output to paraview by</p><pre><code class="language-">data=Dict()
-data[&quot;abs mode&quot;]=abs.(sol.v).
-vtk_write(&quot;tutorial06&quot;,mesh, data)</code></pre><p>Note However, that the vtk-file name will be <code>tutorial06_quad.vtu</code>.</p><h2 id="Summary"><a class="docs-heading-anchor" href="#Summary">Summary</a><a id="Summary-1"></a><a class="docs-heading-anchor-permalink" href="#Summary" title="Permalink"></a></h2><p>Quadratic elements are an easy matter. Just set <code>order=:quad</code> when calling <code>discretize</code>.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="tutorial_05_mesh_refinement.html">« Tutorial 05 Mesh Refinement</a><a class="docs-footer-nextpage" href="NLEVP.html">The NLEVP module »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 25 March 2021 13:08">Thursday 25 March 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+</pre><p>All subsequent steps are the same. For instance, solving for an eigenvalue is done by</p><pre><code class="language-julia">sol,nn,flag=mslp(L,340*2*pi,maxiter=20,tol=1E-11,output=true)
+#</code></pre><pre class="documenter-example-output">Launching MSLP solver...
+Iter   dz:     z:
+----------------------------------
+0			Inf	2136.2830044410593
+1			382.9705879256757	1753.4014913373253 + 8.259427312643453im
+2			42.502458544562025	1710.9235160596425 + 9.70185534924655im
+3			0.5342818649578048	1710.3901346228909 + 9.732861060842836im
+4			8.4413480680881e-5	1710.3900506855896 + 9.732870014343618im
+5			1.5462854887275517e-11	1710.390050685605 + 9.73287001434383im
+6		3.155516543983256e-8	9.322369603784163e-12	1710.3900506856144 + 9.73287001434386im
+Solution has converged!
+...finished MSLP!
+#####################
+ Results
+#####################
+Number of steps: 6
+Last step parameter variation:9.322369603784163e-12
+Auxiliary eigenvalue λ residual (rhs):3.155516543983256e-8
+Eigenvalue:1710.3900506856144 + 9.73287001434386im</pre><p>And writing output to paraview by</p><pre><code class="language-julia">data=Dict()
+data[&quot;abs mode&quot;]=abs.(sol.v)
+vtk_write(&quot;tutorial06&quot;,mesh, data)</code></pre><p>Note However, that the vtk-file name will be <code>tutorial06_quad.vtu</code>.</p><h2 id="Summary"><a class="docs-heading-anchor" href="#Summary">Summary</a><a id="Summary-1"></a><a class="docs-heading-anchor-permalink" href="#Summary" title="Permalink"></a></h2><p>Quadratic elements are an easy matter. Just set <code>order=:quad</code> when calling <code>discretize</code>.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="tutorial_05_mesh_refinement.html">« Tutorial 05 Mesh Refinement</a><a class="docs-footer-nextpage" href="NLEVP.html">The NLEVP module »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 25 March 2021 13:13">Thursday 25 March 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

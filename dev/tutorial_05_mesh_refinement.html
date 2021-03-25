@@ -25,38 +25,37 @@ data=Dict()
 data[&quot;speed_of_sound&quot;]=c
 data[&quot;abs&quot;]=abs.(sol.v)/maximum(abs.(sol.v)) #normalize so that max=1
 data[&quot;phase&quot;]=angle.(sol.v)
-vtk_write(&quot;test&quot;, mesh, data) # Write the solution to paraview</code></pre><pre><code class="language-none">Launching Householder...
+vtk_write(&quot;test&quot;, mesh, data) # Write the solution to paraview</code></pre><pre class="documenter-example-output">Launching Householder...
 Iter    Res:     dz:     z:
 ----------------------------------
 0		Inf	Inf	2513.2741228718346
-1		3.3678010621821997e6	672.6717790631509	1840.644381094955 + 7.520161245130288im
-2		457309.5623269443	125.32039552244363	1715.3398137797765 + 9.511880065048567im
-3		15754.920293139632	4.636826536115793	1710.7041295613465 + 9.614798251130926im
-4		21.537680317163897	0.006356125798411251	1710.6977772512585 + 9.615018459466514im
-5		4.045803703302238e-5	1.1939919720254716e-8	1710.6977772393393 + 9.615018460170372im
-6		2.6334860638026723e-8	7.85077700900375e-12	1710.6977772393466 + 9.61501846017332im
-7		1.4995064722670382e-8	4.324048085871753e-12	1710.6977772393423 + 9.615018460173136im
-8		1.0838615959911618e-8	3.1913416131870233e-12	1710.697777239339 + 9.615018460173363im
-9		1.4098455247391106e-8	4.099642246569255e-12	1710.6977772393432 + 9.615018460173125im
-10		1.919724130587623e-9	4.655004020764636e-13	1710.6977772393427 + 9.615018460173225im
+1		3.3678010621822057e6	672.6717790631519	1840.644381094954 + 7.520161245130569im
+2		457309.5623268847	125.32039552242728	1715.339813779792 + 9.511880065049507im
+3		15754.9202931386	4.636826536115463	1710.7041295613622 + 9.614798251127272im
+4		21.537680259244564	0.006356125781386641	1710.697777251291 + 9.615018459456826im
+5		4.0497679640740586e-5	1.1951508959367337e-8	1710.6977772393611 + 9.615018460176156im
+6		2.0323528713856573e-8	5.993697529856073e-12	1710.6977772393554 + 9.615018460174255im
+7		1.7771745094675823e-9	5.429524106964552e-13	1710.697777239355 + 9.615018460173959im
+8		8.8049647802073e-9	2.5815690724245293e-12	1710.6977772393525 + 9.615018460173319im
+9		5.9259662326431886e-9	1.819114299348317e-12	1710.6977772393543 + 9.615018460173298im
+10		1.2897166461979648e-9	4.557489180949226e-13	1710.6977772393539 + 9.615018460173328im
 Warning: Maximum number of iterations has been reached!
 ...finished Householder!
 #####################
- Householder results 
+ Householder results
 #####################
 Number of steps: 10
-Last step parameter variation:4.655004020764636e-13
-Auxiliary eigenvalue λ residual (rhs):1.919724130587623e-9
-Eigenvalue:1710.6977772393427 + 9.615018460173225im
-Eigenvalue/(2*pi):272.26600738395945 + 1.5302777158563927im
-</code></pre><h2 id="refine-mesh"><a class="docs-heading-anchor" href="#refine-mesh">refine mesh</a><a id="refine-mesh-1"></a><a class="docs-heading-anchor-permalink" href="#refine-mesh" title="Permalink"></a></h2><p>Now let&#39;s call <code>octosplit</code> for creating the refined mesh</p><pre><code class="language-julia">fine_mesh=octosplit(mesh)</code></pre><pre><code class="language-none">mesh: Rijke_mm.msh
+Last step parameter variation:4.557489180949226e-13
+Auxiliary eigenvalue λ residual (rhs):1.2897166461979648e-9
+Eigenvalue:1710.6977772393539 + 9.615018460173328im
+Eigenvalue/(2*pi):272.2660073839612 + 1.5302777158564091im</pre><h2 id="refine-mesh"><a class="docs-heading-anchor" href="#refine-mesh">refine mesh</a><a id="refine-mesh-1"></a><a class="docs-heading-anchor-permalink" href="#refine-mesh" title="Permalink"></a></h2><p>Now let&#39;s call <code>octosplit</code> for creating the refined mesh</p><pre><code class="language-julia">fine_mesh=octosplit(mesh)</code></pre><pre class="documenter-example-output">mesh: Rijke_mm.msh
 #################
 points:     6172
 lines:      0
 triangles:  6248
 tetrahedra: 27040
 #################
-domains: Cold, Flame, Flame_in, Flame_out, Hot, Inlet, Interior, Outlet, Walls</code></pre><p>and solve the problem again with the fine mesh for comparison.</p><pre><code class="language-julia">c=generate_field(fine_mesh,speedofsound)
+domains: Cold, Flame, Flame_in, Flame_out, Hot, Inlet, Interior, Outlet, Walls</pre><p>and solve the problem again with the fine mesh for comparison.</p><pre><code class="language-julia">c=generate_field(fine_mesh,speedofsound)
 L=discretize(fine_mesh,dscrp,c)
 sol,nn,flag=householder(L,400*2*pi,maxiter=10)
 #write to file
@@ -67,11 +66,11 @@ data[&quot;phase&quot;]=angle.(sol.v)
 vtk_write(&quot;fine_test&quot;, fine_mesh, data) # Write the solution to paraview
 
 # If you think that&#39;s not enough, well, then try...
-fine_mesh=octosplit(fine_mesh)</code></pre><pre><code class="language-none">mesh: Rijke_mm.msh
+fine_mesh=octosplit(fine_mesh)</code></pre><pre class="documenter-example-output">mesh: Rijke_mm.msh
 #################
 points:     42507
 lines:      0
 triangles:  24992
 tetrahedra: 216320
 #################
-domains: Cold, Flame, Flame_in, Flame_out, Hot, Inlet, Interior, Outlet, Walls</code></pre><h2 id="Summary"><a class="docs-heading-anchor" href="#Summary">Summary</a><a id="Summary-1"></a><a class="docs-heading-anchor-permalink" href="#Summary" title="Permalink"></a></h2><p>The <code>octosplit</code>-function allows you to refine your mesh by bisecting all edges. This creates a new mesh with eight-times as many tetrahedral cells. The tool is quite useful for running h-convergence tests for your set-up.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="tutorial_04_perturbation_theory.html">« Tutorial 04 Perturbation Theory</a><a class="docs-footer-nextpage" href="tutorial_06_second_order_elements.html">Tutorial 06 Second Order Elements »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 25 March 2021 13:08">Thursday 25 March 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+domains: Cold, Flame, Flame_in, Flame_out, Hot, Inlet, Interior, Outlet, Walls</pre><h2 id="Summary"><a class="docs-heading-anchor" href="#Summary">Summary</a><a id="Summary-1"></a><a class="docs-heading-anchor-permalink" href="#Summary" title="Permalink"></a></h2><p>The <code>octosplit</code>-function allows you to refine your mesh by bisecting all edges. This creates a new mesh with eight-times as many tetrahedral cells. The tool is quite useful for running h-convergence tests for your set-up.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="tutorial_04_perturbation_theory.html">« Tutorial 04 Perturbation Theory</a><a class="docs-footer-nextpage" href="tutorial_06_second_order_elements.html">Tutorial 06 Second Order Elements »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 25 March 2021 13:13">Thursday 25 March 2021</span>. Using Julia version 1.5.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
