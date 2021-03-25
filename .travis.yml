@@ -10,6 +10,7 @@ jobs:
       os: linux
       script:
         - julia --project --check-bounds=yes -e 'import Pkg; Pkg.build()'
+        - julia --project --check-bounds=yes -e 'Pkg.add("Documenter")'
         - julia --color=yes --project=docs/ -e 'using Pkg; Pkg.instantiate()'
         - julia --color=yes --project=docs/ docs/make.jl
       after_success: skip
