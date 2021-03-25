@@ -1,3 +1,7 @@
+| **Documentation**                                                               | **Build Status**                                                                                |
+|:-------------------------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------:|
+| [![][docs-stable-img]][docs-stable-url] | [![][travis-img]][travis-url] |
+
 # WavesAndEigenvalues.jl
 Julia package for handling various wave-equations and (non-linear) eigenvalue problems.
 
@@ -23,14 +27,14 @@ The package has evolved from academic research in thermoacoustic-stability analy
 
 ## NLEVP
 Assume you are a *literally* a rocket scientist and you want to solve an eigenvalue problem like
-```math
-(\mathbf K+\omega \mathbf C + \omega^2 \mathbf M+ n\exp(-i\omega\tau) \mathbf F]\mathbf p = 0
 ```
-Where $\mathbf K$, $\mathbf C$, $\mathbf M$, and $\mathbf F$ are some matrices, $i$ the imaginary unit, $n$ and $\tau$ some parameters, and $\omega$ and $\mathbf p$ unknown eigenpairs.
+[K+ω*C+ω^2*M+n*exp(-iωτ) F] p = 0
+```
+Where `K`, `C`, `M`, and `F` are some matrices, `i` the imaginary unit, `n` and `τ` some parameters, and `ω` and `p` unknown eigenpairs.
 Then the **NLEVP** module lets you solve this equation and much more. Actually, any non-linear eigenvalue problem can be solved. Doing science in some other field than rockets or even being a pure mathematician is, thus, no problem at all. Just specify your favourite nonlinear eigenvalue problem and have fun. And *fun* here includes adjoint-based perturbation of your solution up to arbitrary order!  
 
 ## Meshutils
-OK, this was theoretical. But you are a real scientist, so you know that the matrices $\mathbf K$, $\mathbf C$, $\mathbf M$, and $\mathbf F$ are obtained by discretizing some equation using a specific mesh. You do not want to be too limited to simple geometries so unstructured tetrahedral meshing is the method of choice.  **Meshutils** is the module that gives you the tools to read and process such meshes.
+OK, this was theoretical. But you are a real scientist, so you know that the matrices `K`, `C`, `M`, and `F` are obtained by discretizing some equation using a specific mesh. You do not want to be too limited to simple geometries so unstructured tetrahedral meshing is the method of choice.  **Meshutils** is the module that gives you the tools to read and process such meshes.
 
 ## Helmholtz
 You are a practitioner? Fine, then eigenvalue theory and mesh handling should not bother your every day work too much.
