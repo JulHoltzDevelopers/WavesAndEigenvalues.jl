@@ -1,9 +1,10 @@
 path=pwd()
-import Pkg
-Pkg.activate(".")
+
 ##
 
 using Documenter
+import Pkg
+Pkg.activate(".")
 using WavesAndEigenvalues
 ##
 cd("./docs")
