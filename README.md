@@ -41,3 +41,18 @@ OK, this was theoretical. But you are a real scientist, so you know that the mat
 You are a practitioner? Fine, then eigenvalue theory and mesh handling should not bother your every day work too much.
 You just want to read in a mesh, specify some properties (boundary conditions, speed of sound field...), and get a report on
 the stability of your configuration? **Helmholtz** is your module! It even tells you how to optimize your design.
+
+[docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
+ [docs-stable-url]: https://julholtzdevelopers.github.io/WavesAndEigenvalues.jl/dev/
+
+ [travis-img]: https://travis-ci.com/JulHoltzDevelopers/WavesAndEigenvalues.jl.svg?branch=master
+ [travis-url]: https://travis-ci.com/github/JulHoltzDevelopers/WavesAndEigenvalues.jl
+
+ [appveyor-img]: https://ci.appveyor.com/api/projects/status/...
+ [appveyor-url]: https://ci.appveyor.com/project/...
+
+ [codecov-img]: https://codecov.io/gh/...
+ [codecov-url]: https://codecov.io/gh/...
+
+
+ [issues-url]: https://github.com/...
