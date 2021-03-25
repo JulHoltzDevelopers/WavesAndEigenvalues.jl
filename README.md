@@ -1,5 +1,6 @@
 # WavesAndEigenvalues.jl
-Julia package for handling various wave-equations and (non-linear) eigenvalue problems.
+
+*Julia package for handling various wave-equations and (non-linear) eigenvalue problems.*
 
 | **Documentation**                                                               | **Build Status**                                                                                |
 |:-------------------------------------------------------------------------------:|:-----------------------------------------------------------------------------------------------:|
