@@ -4,6 +4,10 @@ EditURL = "<unknown>/tutorial_08_custom_FTF.jl"
 
 # Tutorial 08 Custom FTF
 
+!!! warning
+    This tutorial is still under construction. We are publishing updated versions
+    of our code and more tutorials every now and then. So stay tuned.
+
 The typical use case for thermoacoustic stability assessment will require
 case-speicific data. e.g, measured impedance functions or flame transfer
 functions. This tutorial explains how to specify custom functions in order to
@@ -58,34 +62,34 @@ mesh=Mesh("Rijke_mm.msh",scale=0.001) #load mesh
 dscrp=Dict() #initialize model descriptor
 dscrp["Interior"]=(:interior, ()) #define resonant cavity
 dscrp["Outlet"]=(:admittance, (:Y,1E15)) #specify outlet BC
-γ=1.4 #ratio of specific heats
-ρ=1.225 #density at the reference location upstream to the flame in kg/m^3
-Tu=300.0    #K unburnt gas temperature
-Tb=1200.0    #K burnt gas temperature
-P0=101325.0 # ambient pressure in Pa
-A=pi*0.025^2 # cross sectional area of the tube
-Q02U0=P0*(Tb/Tu-1)*A*γ/(γ-1) #the ratio of mean heat release to mean velocity Q02U0
-x_ref=[0.0; 0.0; -0.00101] #reference point
-n_ref=[0.0; 0.0; 1.00] #directional unit vector of reference velocity
-R=287.05 # J/(kg*K) specific gas constant (air)
-speedofsound(x,y,z) = z<0. ? sqrt(γ*R*Tu) : sqrt(γ*R*Tb)
-c=generate_field(mesh,speedofsound)
+γ=1.4; #ratio of specific heats
+ρ=1.225; #density at the reference location upstream to the flame in kg/m^3
+Tu=300.0;    #K unburnt gas temperature
+Tb=1200.0;    #K burnt gas temperature
+P0=101325.0; # ambient pressure in Pa
+A=pi*0.025^2; # cross sectional area of the tube
+Q02U0=P0*(Tb/Tu-1)*A*γ/(γ-1); #the ratio of mean heat release to mean velocity Q02U0
+x_ref=[0.0; 0.0; -0.00101]; #reference point
+n_ref=[0.0; 0.0; 1.00]; #directional unit vector of reference velocity
+R=287.05; # J/(kg*K) specific gas constant (air)
+speedofsound(x,y,z) = z<0. ? sqrt(γ*R*Tu) : sqrt(γ*R*Tb);
+c=generate_field(mesh,speedofsound);
+nothing #hide
 ```
 
 btw this is the moment where we specify the values of n and τ
 
 ```@example tutorial_08_custom_FTF
-n=1 #interaction index
-τ=0.001 #time delay
-
-#
+n=1; #interaction index
+τ=0.001; #time delay
+nothing #hide
 ```
 
 but instead of passing n and τ and its values to the flame description we
 just pass the FTF
 
 ```@example tutorial_08_custom_FTF
-dscrp["Flame"]=(:flame,(γ,ρ,Q02U0,x_ref,n_ref,FTF)) #flame dynamics
+dscrp["Flame"]=(:flame,(γ,ρ,Q02U0,x_ref,n_ref,FTF)); #flame dynamics
 
 #... discretize ...
 L=discretize(mesh,dscrp,c)
@@ -152,33 +156,39 @@ sol_base,nn,flag=mslp(H,340*2*pi,maxiter=20,tol=1E-11)
 
 The model H has no flame transfer function, but the flame response appears as a
 parameter `:FTF`. We set this parameter to 0 and solved the model, i.e. we
-computed a possive solution.  This solution will serve as a baseline. Note, that
+computed a passive solution.  This solution will serve as a baseline. Note, that
 it is not necessary to use a passive solution as baseline, a nonzero baseline
 flame response would also work. Anyway, the baseline solution is used to build
-a XX-order pade-approximation. For convenience we import some tools to handle
+a 16th-order Padé-approximation. For convenience we import some tools to handle
 the algebra.
 
 ```@example tutorial_08_custom_FTF
-#
 using WavesAndEigenvalues.Helmholtz.NLEVP.Pade: Polynomial, Rational_Polynomial, prodrange, pade
-#
-perturb_fast!(sol_base,H,:FTF,32)
-#
-func=pade(Polynomial(sol_base.eigval_pert[Symbol("FTF/Taylor")]),15,15)
+perturb_fast!(sol_base,H,:FTF,16)
+func=pade(Polynomial(sol_base.eigval_pert[Symbol("FTF/Taylor")]),8,8)
 ω(z,k=0)=func(z-η0,k)
-#
 ```
 
 ## Newton-Raphson for finding flame response
-```math
-\eta = FTF(\omega(\Delta\eta)}-\eta_0
-```
-From Newton-Raphson we find
 
-Δη_{k+1}=Δη_{k+1}-\frac{FTF(ω(Δη_k)}-Δη_k}{FTF'(ω(Δη_k)}ω''(Δη_k)-Δη_k-1}
+Now, we can deploy a simple Newton-Raphson iteration for finding the eigenfrequency
+for a chosen FTF as a postprocessing step. This is possible, because we have a good
+approximation of ``\omega`` as a function of the flame response ``\eta`` and a FTF
+would link ``\omega``to a flame response. Hence, the eigenfrequency of the problem
+is implicitly given by the scalar (sic!) equation:
+```math
+\eta = FTF(\omega(\Delta\eta))-\eta_0
+```
+
+Which we can first solve for ``\eta`` using Newton-Raphson
+```math
+Δη_{k+1}=Δη_{k}-\frac{FTF(ω(Δη_k))-Δη_k}{FTF'(ω(Δη_k))ω(Δη_k)-1}
+```
+
+
+and then for ``\omega`` by plugging ``\eta`` into ``\omega=\omega(\eta)``.
 
 ```@example tutorial_08_custom_FTF
-#
 n=1
 τ=0.001
 η=sol_base.params[:FTF]
@@ -186,15 +196,15 @@ for ii=1:10
     global omeg,η
     omeg=ω(η)
     η-=(FTF(omeg)-η)/(FTF(omeg,1)*ω(η,1)-1)
-    println(ii,":",η)
+    println("iteration #",ii," estimate η:",η)
 end
 println(ω(η)/2pi," η :",η," Res:",FTF(omeg)-η)
-#
 sol_exact,nn,flag=mslp(L,ω(η)/2pi,maxiter=20,tol=1E-11,output=false) #solve again
 ω_exact=sol_exact.params[:ω]
 println(" exact=$(ω_exact/2/pi)  vs  approx=$(ω(η)/2pi))")
-#
 ```
+
+Works like a charm!
 
 ---
 

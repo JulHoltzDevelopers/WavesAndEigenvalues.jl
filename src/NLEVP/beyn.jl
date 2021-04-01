@@ -366,3 +366,387 @@ function count_poles_and_zeros(L,Γ;N=16,output=false)
 
   return gauss(0.0+0.0im,integrand,Γ,N,output)/2/pi/1.0im
 end
+## Projection method stuff
+"""
+    V=initialize_V(d::Int,l::Int,random::Bool=false)
+
+initialioze matrix with `d`rows and `l` colums either as diagonal matrix
+featuring ones on the main diagonal and anywhere else or with random entries
+(`random`=true).
+
+See also: [`generate_subspace`](@ref)
+"""
+function initialize_V(d::Int,l::Int;random::Bool=false)
+    if random
+        V=rand(ComplexF64,d,l)
+        for i=1:l
+            V[:,i].\=LinearAlgebra.norm(V[:,i])
+        end
+    else
+        V=zeros(ComplexF64,d,l)
+        for i=1:l
+            V[i,i]=1.0+0.0im
+        end
+    end
+    return V
+end
+raw"""
+    Q,resnorm=generate_subspace(L,Y,tol,Z,N;output=true))
+
+Compute orthonormal `Q` basis for a subspace that can be used to reduce the
+dimension of `L`. The created subspace gurantees the residual of `L(z)\V` to be less than
+`tol` for each `z∈Z`.
+
+# Arguments
+- `L::LinearOperatorFamily`: operator family for which the subspace is to be computed
+- `Y::matrix`: matrix for residual test
+- `tol::Float64`: tolerance for residual test
+- `Z::List`: List of sample points
+- `N::Int`: (optional) if set the list Z is interpreted as edges of a closed polygonal contour and N Gauss-Legendre sample points are generated for each edge.
+- `output::Bool=false`: (optional) toggle progressbar
+- `include_Y::Bool=true`: (optional) include Y in subspace
+
+# Returns
+
+- `Q::Matrix`: unitary matrix whose colums form the basis of the subspace
+- `resnorm::List`: list of residuals at the sample points computed during subspace generation. (these values are an upper bound)
+
+# Notes
+
+The algorithm is based on the idea in [1]. However, it uses incremental QR
+decompositions to built the subspace and is not computing Beyn's integral.
+However, the obtained matrix can be used to project `L` on teh subspace and use
+Beyn's algorithm or any other eigenvalue solver on the projected problem.
+
+# References
+
+[1] A Study on Matrix Derivatives for the Sensitivity Analysis of Electromagnetic
+Eigenvalue Problems, P. Jorkowski and R. Schuhmann, 2020, IEEE Trans. Magn., 56,
+[doi:10.1109/TMAG.2019.2950513](https://doi.org/10.1109/TMAG.2019.2950513)
+
+See also: [`beyn`](@ref), [`initialize_V`](@ref), [`project`](@ref)
+"""
+function generate_subspace(L,Y,tol,Z;output::Bool=true,tol_err::Float64=Inf,include_Y=true)
+    #TODO: sanity checks for sizes
+    d,k=size(Y)
+    dim=k
+    N=length(Z) #IDEA: consider random permutation
+    ## initialize subspace from first point
+    A=[] #compressed qr storage for incremental qr
+    τ=[] #compressed qr storage for incremental qr
+
+    for kk = 1: k
+        if include_Y
+            qrfactUnblockedIncremental!(τ,A,Y[:,kk:kk])
+        else
+            qrfactUnblockedIncremental!(τ,A,L(Z[1])\Y[:,kk:kk])
+        end
+    end
+    #QR=LinearAlgebra.qr(L(Z[1])\Y)
+    #Q=QR.Q[:,1:dim]# TODO: optimize these QR calls
+    resnorm=zeros(N*k)
+    idx=0
+    Q=get_Q(τ,A) #TODO: incrementally create only the last column, consider preallocation for speed
+    QY=Q'*Y #project rhs
+
+
+    ## Preallacations
+    #Y=Array{ComplexF64}(undef,d,1)
+    #Y_exact=Array{ComplexF64}(undef,d,1)
+
+    if output
+        prog = ProgressMeter.Progress(k*N,desc="Subspace.. ", dt=1,
+         barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),)
+    end
+    for z in Z
+        if dim==d
+            break
+        end
+        idx+=1
+        Lz=L(z)
+        #Lnorm=LinearAlgebra.norm(Lz)
+        Lnorm=1
+        QLQ=Q'*Lz*Q #projection to subspace
+        for kk=1:k
+            x=QLQ\QY[:,kk] #solve projected problem
+            X=Q*x #backprojection
+            #residual test
+            #weights=ones(ComplexF64,d)
+            #weights[20:end].=0
+            #weights=get_weights(Lz)
+            weights=1
+            res=LinearAlgebra.norm((weights).*(Lz*X-Y[:,kk]))
+            res/=Lnorm
+            #println("$(kk+(idx-1)*k): $res vs $tol")
+            #TODO: check that supdspace does not get linearly dependent
+            # in order to enable 0 tolerance
+            if res>tol
+                # if true# idx<=3
+                #     println("vorher:")
+                #     println(idx," ",kk+(idx-1)*k," ",res," ",resnorm[5])
+                #     println("nacher:")
+                #     flush(stdout)
+                # end
+                dim+=1
+                X_exact=Lz\Y[:,kk:kk]
+                #err=LinearAlgebra.norm(weights.*(X_exact.-X))
+                #println("error:$err")
+                X=X_exact
+                res=LinearAlgebra.norm((weights).*(Lz*X-Y[:,kk]))
+                #if err>tol_err
+                #    #tol=max(tol,res/10) #TODO: the minimum operation is not necessary
+                #    tol=res*10
+                #end
+
+                #res=err
+                res/=Lnorm
+                #IMPORTANT qrfactUnblockedIncremental! overwrites X!
+                #Therfore command must come after residual calculation
+                qrfactUnblockedIncremental!(τ,A,X[:,1:1])
+                #Q=create_Q(τ,A)
+                Q_old,Q=Q,Array{ComplexF64}(undef,d,dim)
+                Q[:,1:end-1]=Q_old[:,:]
+                #initialize last column with e_dim_vector
+                #this is unused but allacated space. Therefore its safe to be used
+                # e_dim will be overwritten later to with the true
+                # column, but it is used to initialize finding the
+                #true column.
+                Q[:,end]=zeros(ComplexF64,d)
+                Q[dim,end]=1
+                Q[:,end]=mult_QV(τ,A,Q[:,end]) #build last column
+                ##reinitialize cache
+                QLQ=Q'*Lz*Q #projection to subspace #TODO: do this incrementally using last column only
+                QY=Q'*Y# project rhs
+                #ΔQLQ=Q*L*ΔQ #only build last colum
+
+
+
+                #QV=[QV; ΔQ'*V]
+                # if true#idx<=3
+                #     println(idx," ",kk+(idx-1)*k," ",res," ",resnorm[5])
+                #     flush(stdout)
+                # end
+            end
+            resnorm[kk+(idx-1)*k]=res
+            if output
+                ProgressMeter.next!(prog)
+            end
+        end
+    end
+    #Q=create_Q(τ,A)
+    if output
+        println("Finished subspace generation!")
+        if tol_err<Inf
+            println("adapted residual tolerance is $tol .")
+        end
+    end
+    return Q,resnorm
+end
+
+function generate_subspace(L,Y,tol,Γ,N::Int;output::Bool=true,tol_err::Float64=Inf,include_Y=true)
+    ## generate list of Gauss-Legendre points
+    X,W=FastGaussQuadrature.gausslegendre(N)
+    lΓ=length(Γ)
+    Z=zeros(ComplexF64, lΓ*N) #TODO: undef intialization
+    #TODO: remove doubled edge points!
+    for i = 1:lΓ
+        if i==lΓ
+            a,b=Γ[i],Γ[1]
+        else
+            a,b=Γ[i],Γ[i+1]
+        end
+        Z[1+(i-1)*N:i*N]=X.*(b-a)/2 .+(a+b)/2 #transform to segment
+    end
+    return generate_subspace(L,Y,tol,Z,output=output,tol_err=tol_err,include_Y=include_Y)
+end
+
+
+"""
+    P::LinearOperatorFamily=project(L::LinearOperatorFamily,Q)
+
+Project `L` on the subspace spanned by the unitary matrix `Q`, i.e.
+`P(z)=Q'*L(z)*Q`.
+
+See also: [`generate_subspace`](@ref)
+"""
+function project(L::LinearOperatorFamily,Q)
+    P=LinearOperatorFamily()
+    P.params=deepcopy(L.params)
+    P.eigval=L.eigval
+    P.auxval=L.auxval
+    P.mode=deepcopy(L.mode)
+    P.active=deepcopy(L.active)
+
+    #term=Term(A2,(pow2,),((:λ,),),"A2")
+    for term in L.terms
+        M=Q'*term.coeff*Q
+        push!(P,Term(M,deepcopy(term.func),deepcopy(term.params),
+            deepcopy(term.symbol),deepcopy(term.operator)))
+    end
+    return P
+end
+
+## incremental QR
+# TODO: merge request for julia base
+#===
+hack of line 185 in
+https://github.com/JuliaLang/julia/blob/69fcb5745bda8a5588c089f7b65831787cffc366/stdlib/LinearAlgebra/src/qr.jl#L301-L378
+for obtaining incremental qr
+===#
+using LinearAlgebra: reflector!, reflectorApply!
+##
+function qrfactUnblockedIncremental!(τ,A,V::AbstractMatrix{T}) where {T} #AbstarctArray?
+    #require_one_based_indexing(A)
+    #require_one_based_indexing(T)
+    V=deepcopy(V)
+    m=length(A)
+    n=length(V)
+    #apply all previous reflectors
+    for k=1:m
+        x = view(A[k], k:n,1)#TODO: consider end
+        reflectorApply!(x,τ[k],view(V,k:n,1:1))
+    end
+    #create new reflector
+    x = view(V, m+1:n,1)
+    τk= reflector!(x)
+
+    #append latest updates
+
+    #if  !isapprox(V[m+1],0.0+0.0im,atol=1E-8)
+        push!(τ,τk)
+        push!(A,V)
+    #end
+    return
+end
+##
+function mult_VQ(τ,A,V)
+    m=length(A)
+    n=length(A[1])
+    #@inbounds begin
+        for k=1:m
+            τk=τ[k]
+            vk=zeros(ComplexF64,n)
+            vk[k]=1
+            vk[k+1:end]=A[k][k+1:end]
+            V=(V-(V*vk)*(vk'*τk))
+        end
+    #end
+    return V
+end
+function mult_QV(τ,A,V;trans=true)
+    m=length(A)
+    n=length(A[1])
+    M=1:m
+    if trans
+        M=reverse(M)
+    end
+    #@inbounds begin
+        for k=M #its transposed so householder transforms are executed in reverse order
+            τk=τ[k]
+            vk=zeros(ComplexF64,n)
+            vk[k]=1
+            vk[k+1:end]=A[k][k+1:end]
+            V=(V-(τk*vk)*(vk'*V))
+        end
+    #end
+    return V
+end
+
+function get_Q(τ,A)
+    n=size(A[1],1)
+    dim=length(τ)
+    mult_QV(τ,A,initialize_V(n,dim))
+end
+
+function get_R(A)
+    n=length(A)
+    m=length(A[1])
+    R=zeros(ComplexF64,m,n)
+    for i=1:n
+        R[1:i,i]=A[i][1:i]
+    end
+    return R
+end
+
+
+function get_weights(M)
+    m,n=size(M)
+    weights=Array{ComplexF64}(undef,m)
+    for i=1:m
+        weights[i]=M[i,i]#sum(M[i,:])
+    end
+    return 1. /weights
+end
+
+
+## Givens rotation
+function givens_rot!(M,i,j)
+    a=M[i]
+    b=M[j]
+    if b!=0
+        #r=hypot(a,b)
+        #hack of chypot
+        r = a/b
+        r = b*sqrt(1.0+0.0im+r*r)
+        c=a/r
+        s=-b/r
+    else
+        c = 1.0+0.0im
+        s = 0.0+0.0im
+        r = a
+    end
+    ϕ=log(c+1.0im*s)/1.0im
+    #apply givens rotation
+    M[i]=r
+    M[j]=ϕ
+    return nothing
+end
+function incremental_QR!(A,v)
+    push!(A,v)
+    n=length(A)
+    m=length(A[1])
+    #apply previous givens rotations
+    for j=1:n-1
+        for i=j+1:m
+            ϕ=A[j][i]
+            c=cos(ϕ)
+            s=sin(ϕ)
+            A[n][j],A[n][i]=c*A[n][j]-s*A[n][i], s*A[n][j]+c*A[n][i]
+        end
+    end
+
+    #do new givens rotations
+    for j=n+1:m
+        givens_rot!(A[n],n,j)
+    end
+    return nothing
+end
+function get_Q(A)
+    m=length(A[1])
+    n=length(A)
+    Q=zeros(ComplexF64,m,n)
+    for i=1:n
+        Q[i,i]=1
+    end
+    for i=1:m
+        for j=i+1:n
+            ϕ=A[i][j]
+            c=cos(ϕ)
+            s=sin(ϕ)
+            Q[:,i],Q[:,j]=c*Q[:,i]-s*Q[:,j], s*Q[:,i]+c*Q[:,j]
+        end
+    end
+    return Q
+end
+
+
+#TODO: hack the imporved julia version
+function chypot(a,b)
+    if a == 0
+        h=0
+    else
+        r = b/a
+        h = a*sqrt(1+r*r)
+    end
+    return h
+end
