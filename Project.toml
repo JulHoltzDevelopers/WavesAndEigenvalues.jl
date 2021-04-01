@@ -1,7 +1,7 @@
 name = "WavesAndEigenvalues"
 uuid = "a73532ca-c7c2-4c65-85c3-8d67803e4c1d"
 authors = ["Georg A. Mensah <gmensah@ethz.ch>", "Alessandro Orchini <a.orchini@tu-berlin.de>"]
-version = "0.2.2"
+version = "0.2.3"
 
 [deps]
 Arpack = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
