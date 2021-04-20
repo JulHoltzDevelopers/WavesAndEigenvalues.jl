@@ -78,14 +78,14 @@ function terminal(R,c,A,ρ=1.4*101325/c^2;init=true)
     end
 
     if init
-         M=[+1      -R;
+         M=[+R      -1;
            +1       +1;
            1*A/(ρ*c)  -1*A/(ρ*c)]
 
     else
         M=[ -1       -1;
             -1*A/(ρ*c)  +1*A/(ρ*c);
-          -R     +1]
+          -1     +R]
     end
     return [[M,(),()],]
 end
@@ -133,7 +133,7 @@ The model is build on  the transfer matrix from [1]
 
 [1] F. P. Mechel, Formulas of Acoustic, Springer, 2004, p. 728
 """
-function helmholtz(V,l_n,d_n,c,A,ρ=1.4*101325/c1^2)
+function helmholtz(V,l_n,d_n,c,A,ρ=1.4*101325/c^2)
     #=====
 
     p_u=p_d
@@ -191,6 +191,8 @@ function helmholtz(V,l_n,d_n,c,A,ρ=1.4*101325/c1^2)
             +1.0im*pow1(ω,k)*l/S_n-1.0im*c^2/V*pow(ω,k,-1))
         end
     end
+
+
     function admittance(ω::ComplexF64,k::Int)::ComplexF64
         let Z=impedance
             if k==0
@@ -208,10 +210,74 @@ function helmholtz(V,l_n,d_n,c,A,ρ=1.4*101325/c1^2)
 
 
     out=duct(0,c,A,ρ)
-    push!(out,[M21*A*(ρ*c), (admittance,), ((:ω,),),])
-    #push!(out,[M22*A, (admittance,), ((:ω,),),])
+    #push!(out,[M21, (admittance,), ((:ω,),),])
+    push!(out,[-M21/ρ, (admittance,), ((:ω,),),])
+    return out
 end
 
+
+"""
+    sidewallimp(imp,c,A,ρ=1.4*101325/c^2)
+
+Use function predefined  function `imp` to prescripe a frequency-dependent
+side wall impedance.
+"""
+function sidewallimp(imp,c,A,ρ=1.4*101325/c1^2)
+    M21= [0        0;
+        -1       -1;
+        0         0;
+        0         0]
+    function admittance(ω::ComplexF64,k::Int)::ComplexF64
+        let Z=imp
+            if k==0
+                return 1/Z(ω,0)
+            elseif k==1
+                return -Z(ω,1)/Z(ω,0)^2 #TODO: implement arbitray order chain rule
+            else
+                return NaN+NaN*im
+            end
+        end
+    end
+    function admittance(ω::Symbol)::String
+        return "1/Z($ω)"
+    end
+
+    out=duct(0,c,A,ρ)
+    #push!(out,[M21*A*(ρ*c), (admittance,), ((:ω,),),])
+    push!(out,[M21, (admittance,), ((:ω,),),])
+end
+"""
+    out=lhr(V,l_n,d_n,c,A,ρ=1.4*101325/c^2)
+
+Create linear Helmholtz model according to [1].
+
+#Reference
+[1] Nonlinear effects in acoustic metamaterial based on a cylindrical pipe with
+    ordered Helmholtz resonators,J. Lan, Y. Li, H. Yu, B. Li, and X. Liu, Phys.
+    Rev. Lett. A., 2017, [doi:10.1016/j.physleta.2017.01.036](https://doi.org/10.1016/j.physleta.2017.01.036)
+"""
+function lhr(V,l_n,d_n,c,A,ρ=1.4*101325/c^2)
+    r_n=d_n/2
+    S_n=pi*r_n^2
+    B0=ρ*c^2
+    η=1.5E-5 #dynamic viscosity or air in m^2/s
+    R_vis=ρ*l_n/r_n*sqrt(η/2)*S_n# *ω^(1/2) #!!!! wrong in Lan it must be divided not miultiplied by r_n
+    R_rad=1/4*ρ*r_n^2/c*S_n#*ω^2
+    l=l_n+1.7*r_n #length correction
+    Cm=V/(ρ*c^2*S_n^2)
+    Mm=ρ*l*S_n
+    #δ=Rm/Mm
+    ω0=1/(sqrt(Cm*Mm))
+    println("M: $Mm, C: $Cm, freq: $ω0")
+    C=B0*S_n/(1im*ω0^2*V)/(S_n)  #last division to convert between impedance and flow impedance
+    function impedance(ω::ComplexF64,k::Int)::ComplexF64
+        let C=C, R_vis=R_vis, R_rad=R_rad, ω0=ω0
+            return C*pow1(ω,k)-C*ω0^2*pow(ω,k,-1)-C*1im*R_vis/Mm*pow(ω,k,1/2)-C*1im*R_rad/Mm*pow2(ω,k)
+        end
+    end
+
+    return sidewallimp(impedance,c,A,ρ)
+end
 
 
 """
@@ -300,6 +366,8 @@ function discretize(network)
             terms=flame(data...)
         elseif elmt==:helmholtz
             terms=helmholtz(data...)
+        elseif elmt==:helmholtz2
+            terms=lhr(data...)
         else
             println("Warning: unknown element $elmt")
             continue
@@ -317,75 +385,3 @@ function discretize(network)
     return L
 end
 end #module network
-
-## legacy code
-
-# function velocity_node(c,A,ρ)
-#     M=[1*A/(ρ*c) -1*A/(ρ*c);
-#        +1       +1;
-#        1*A/(ρ*c)  -1*A/(ρ*c)]
-#     return [[M,(),()],]
-# end
-# velocity_node(c,A)=velocity_node(c,A,1.4*101325/c^2)
-#
-#
-# function pressure_node(c,A,ρ)
-#     M=[ -1       -1;
-#         -1*A/(ρ*c)  +1*A/(ρ*c);
-#        +1       +1]
-#
-#     return [[M,(),()],]
-# end
-# pressure_node(c,A) = pressure_node(c,A,1.4*101325/c^2)
-
-
-# function velocity_node_start(l,c,A,ρ)
-#     M=[A/(ρ*c) -A/(ρ*c);
-#         0          0;
-#         0          0]
-#
-#     M21=[0         0;
-#         1         0;
-#         0         0]
-#
-#     M22= [0         0;
-#         0         1;
-#         0         0]
-#     M31= [0         0;
-#         0         0;
-#         1         0]
-#     M32= [0         0;
-#         0         0;
-#         0         -1]
-#     out=[[M,(),()],
-#          [M21, (generate_exp_az(1im*l/c),), ((:ω,),),],
-#          [M22, (generate_exp_az(-1im*l/c),), ((:ω,),),],
-#          [M31*A/(ρ*c), (generate_exp_az(1im*l/c),), ((:ω,),),],
-#          [M32*A/(ρ*c), (generate_exp_az(-1im*l/c),), ((:ω,),),],
-#          ]
-#
-#     return out
-# end
-# velocity_node_start(l,c,A) = velocity_node_start(l,c,A,1.4*101325/c^2)
-#
-#
-# function pressure_node_end(l,c,A,ρ)
-#     M=[-1      -1;
-#         -A/(ρ*c) A/(ρ*c);
-#         0          0]
-#
-#     M31=[0        0;
-#         0         0;
-#         1         0]
-#
-#     M32= [0        0;
-#         0         0;
-#         0         1]
-#
-#     out=[[M,(),()],
-#          [M31, (generate_exp_az(1im*l/c),), ((:ω,),),],
-#          [M32, (generate_exp_az(-1im*l/c),), ((:ω,),),],
-#          ]
-#     return out
-# end
-# pressure_node_end(l,c,A) = pressure_node_end(l,c,A,1.4*101325/c^2)
