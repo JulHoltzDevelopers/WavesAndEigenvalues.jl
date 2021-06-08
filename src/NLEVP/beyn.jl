@@ -458,6 +458,7 @@ function generate_subspace(L,Y,tol,Z;output::Bool=true,tol_err::Float64=Inf,incl
         prog = ProgressMeter.Progress(k*N,desc="Subspace.. ", dt=1,
          barglyphs=ProgressMeter.BarGlyphs('|','█', ['▁' ,'▂' ,'▃' ,'▄' ,'▅' ,'▆', '▇'],' ','|',),)
     end
+
     for z in Z
         if dim==d
             break
@@ -517,10 +518,17 @@ function generate_subspace(L,Y,tol,Z;output::Bool=true,tol_err::Float64=Inf,incl
                 ##reinitialize cache
                 QLQ=Q'*Lz*Q #projection to subspace #TODO: do this incrementally using last column only
                 QY=Q'*Y# project rhs
+
+
+                #
+                # recompute residual for Ale
+                x=QLQ\QY[:,kk] #solve projected problem
+                X=Q*x #backprojection
+                res=LinearAlgebra.norm((weights).*(Lz*X-Y[:,kk]))
+                #
+
+
                 #ΔQLQ=Q*L*ΔQ #only build last colum
-
-
-
                 #QV=[QV; ΔQ'*V]
                 # if true#idx<=3
                 #     println(idx," ",kk+(idx-1)*k," ",res," ",resnorm[5])

@@ -1039,6 +1039,9 @@ function get_normal_vectors(mesh::Mesh,output::Bool=true)
     #Identify points A,B,C, and D that form the tetrahedron connected to the
     #surface triangle. D is not part of the surface but is inside the body
     #therefore its positio can be used to find determine the outward direction.
+    if length(mesh.tri2tet)!=0 && mesh.tri2tet[1]==0xffffffff #TODO: Initialize as empty instead with sentinel value
+        link_triangles_to_tetrahedra!(mesh)
+    end
     for (idx,tri) in enumerate(mesh.triangles)
         A,B,C=tri
         tet=mesh.tri2tet[idx]

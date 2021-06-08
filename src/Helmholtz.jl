@@ -10,6 +10,7 @@ import ..NLEVP: generate_1_gz
 include("Meshutils_exports.jl")
 include("NLEVP_exports.jl")
 include("./FEM/FEM.jl")
+include("./FEM/helmholtz_getters.jl")
 include("shape_sensitivity.jl")
 include("Bloch.jl")
 export discretize
@@ -336,6 +337,7 @@ function discretize(mesh::Mesh, dscrp, C; order=:lin, b=:__none__, mass_weightin
 
             if ref_idx==0
                 ref_idx=find_tetrahedron_containing_point(mesh,x_ref)
+                #TODO: check whethere ref_idx is still 0
             end
             if ref_idx ∈ mesh.domains[domain]["simplices"]
                 println("Warning: your reference point is inside the domain of heat release. (short-circuited FTF!)")

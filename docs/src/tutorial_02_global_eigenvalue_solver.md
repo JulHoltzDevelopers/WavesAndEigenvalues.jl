@@ -86,10 +86,8 @@ increase your computation time.
 
 There are several strategies to deal with this problem and each of which might
 be well suited in a certain situation:
-1. Split your domain in several smaller domains. This reduces the potential
-number of eigenvalues in each of the subdomains.
-2. Just repeatedly rerun the solver with increasing values of `l` until
-the found eigenvalues do not change anymore.
+1. Split your domain in several smaller domains. This reduces the potential number of eigenvalues in each of the subdomains.
+2. Just repeatedly rerun the solver with increasing values of `l` until the found eigenvalues do not change anymore.
 
 ## Quadrature points
 

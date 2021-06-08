@@ -7,13 +7,13 @@ EditURL = "<unknown>/tutorial_07_Bloch_periodicity.jl"
 The Helmholtz solver was designed with the application of thermoacoustic
 stability assesment in mind. A very common case is that an annular combustion
 chamber needs assessment. These chamber types feature a discrete rotational
-symmetry, i.e., they are built from one cionstituent entity -- the unit cell -- that
+symmetry, i.e., they are built from one constituent entity -- the unit cell -- that
 implicitly defines the annular geometry by copying it around the circumference
 multiple times. This high regularity of the geometry can be used to efficiently
 model the problem, e.g. only storing the unit cell instead of the
 entire geometry in a mesh-file in order to save memory and even performing the
-entire analysis just and thereby significantly accelerating the computations.[1]
-This tutorial teaches you how to use these features.
+entire analysis thereby significantly accelerating the computations [1]
+This tutorial teaches you how using these features.
 
 !!! note
     To do this tutorial yourself you will need the `"NTNU_12.msh`" file.
@@ -37,7 +37,7 @@ are surfaces associated with the special symmetries of the combustor geometry.
 `"Bloch"` is the surface where one unit cell ends and the next one should begin,
 while `"Symmetry"` is the symmetry plane of the unit-cell. As the mesh is stored
 as a half-cell both surfaces are boundaries. The code will automatically use
-them to create the full mesh or just a unit-cell. First ,let's create a full mesh
+them to create the full mesh or just a unit-cell. First, let's create a full mesh
 We therefore specify the expansion scheme, this is a list of tuples containing
 all domain names we like to expand together with a qualifyer that is either
 `:full`,`:unit`, or `:half`, in order to tell the the code whether the copied
@@ -62,9 +62,9 @@ nothing #hide
 ```
 
 The code automatically recognizes the degree of symmetry -- 12 in the current
-case-- and expands the mesh. Note how the full mesh now has 12 connsecutively
+case-- and expands the mesh. Note how the full mesh now has 12 consecutively
 numbered flames, while all other entities still have a single name even though
-they were copied expanded.
+they were copied.
 
 ## Discretizing the full mesh
 
@@ -98,7 +98,7 @@ would do....
 ## Unit cell computation
 
 Ok, first, we create the unit cell mesh. We therefore set the keyowrd parameter
-`unit` to `true`in the call to `extend_mesh`.
+`unit` to `true` in the call to `extend_mesh`.
 
 ```@example tutorial_07_Bloch_periodicity
 unit_mesh=extend_mesh(mesh,doms,unit=true)
@@ -107,10 +107,9 @@ unit_mesh=extend_mesh(mesh,doms,unit=true)
 Voila, there we have it! Discretization is nearly as simple as with a normal mesh.
 However, to invoke special Bloch-periodic boundary conditions the optional
 parameter `b` must be set to define a symbol that is used as the Bloch wavenumber.
-This option will also triger. The rest is as before.
+The rest is as before.
 
 ```@example tutorial_07_Bloch_periodicity
-#
 c=generate_field(unit_mesh,speedofsound);
 l=discretize(unit_mesh, dscrp, c, b=:b)
 ```
@@ -141,10 +140,10 @@ is exactly the same!
 
 ## Writing output to paraview
 Not only the eigemnvalues much but also the mode shapes. Bloch wave theory
-clearly dictates how to extzend the mode shape from the unit cell to recover
+clearly dictates how to extend the mode shape from the unit cell to recover
 the full-annulus solution.
 
-The vtk_write function does this for you. You, therefore, have to provide it
+The `vtk_write  function does this for you. You, therefore, have to provide it
 with the current Bloch wavenumber. If you provide it with the unit_cell mesh,
 it will just write a single sector to the file.
 
@@ -161,7 +160,7 @@ nothing #hide
 
 Bloch-wave-based analysis, significantly reduces the size of your problem
 without sacrificing any precission. It thereby saves you both memory and
-computational time. All you need to provide is
+computational time.
 
 ## References
 
@@ -176,3 +175,4 @@ N. Noiray and J. Dawson, 2021, Comb. and Flame, [doi:10.1016/j.combustflame.2020
 ---
 
 *This page was generated using [Literate.jl](https://github.com/fredrikekre/Literate.jl).*
+

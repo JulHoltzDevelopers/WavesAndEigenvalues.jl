@@ -147,7 +147,7 @@ function aggregate_elements(mesh::Mesh, el_type=:lin)
                 if fcidx !=0
                     tet[16+jdx]   =  fcidx+4*N_points
                 else
-                    fcidx=find_smplx(inner_triangles,tria)
+                    fcidx=find_smplx(inner_triangles,tria) #TODO: Use the new int_triangles field in mesh
                     if fcidx==0
                         println("Error, face not found!!!")
                         return nothing
@@ -241,7 +241,7 @@ function recombine_hermite(J::CooTrafo,M)
                 valpoints=[1,2,3,4,17,18,19,20] #point indices where value is 1 NOT the derivative!
                 # entires that are based on these points only need no recombination
                 for i =valpoints
-                        A[i]=copy(M[i]) #TODO: Chek whetehr copy is needed or even deepcopy
+                        A[i]=copy(M[i]) #TODO: Chek whether copy is needed or even deepcopy
                 end
                 #now recombine entries that are based on derivativ points with value points
                 for k=0:3
@@ -2605,4 +2605,67 @@ function s33vhc1(J::CooTrafo,c)
     M[12]=0
     M[13]=3*c1/40 + 3*c2/40 + 3*c4/40
     return recombine_hermite(J,M)*abs(J.det)
+end
+
+## shape functions
+function f1(J,p)
+    x,y,z=J.inv*(p.-J.orig)
+    a=1-x-y-z
+    vals=[x,y,z,a]
+    return vals
+end
+
+function f2(J,p)
+    x,y,z=J.inv*(p.-J.orig)
+    a=1-x-y-z
+    vals=[(2*x-1)*x,
+    (2*y-1)*y,
+    (2*z-1)*z,
+    (2*a-1)*a,
+    4*x*y,
+    4*x*z,
+    4*x*a,
+    4*y*z,
+    4*y*a,
+    4*z*a,
+    ]
+    return vals
+end
+function fh(J,p)
+    x,y,z=J.inv*(p.-J.orig)
+    a=1-x-y-z
+    #hermite shape functions (third order polynomial)
+    fh_vtx(x,y,z)=1-3*x^2-13*x*y-13*x*z-3*y^2-13*y*z-3*z^2+2*x^3+13*x^2*y+13*x^2*z+13*x*y^2+33*x*y*z+13*x*z^2+2*y^3+13*y^2*z+13*y*z^2+2*z^3
+    fh_dvtx(x,y,z)=x-2*x^2-3*x*y-3*x*z+x^3+3*x^2*y+3*x^2*z+2*x*y^2+4*x*y*z+2*x*z^2
+    fh_dvtxx(x,y,z)=-x^2+2*x*y+2x*z+x^3-2*x^2*y-2*x^2*z-2*x*y^2-2x*y*z-2*x*z^2
+    fh_fc(x,y,z)=27*x*y*z
+    ##
+    vals=[fh_vtx(y,z,a), #fh01
+        fh_vtx(x,z,a), #fh02
+        fh_vtx(x,y,a), #fh03
+        fh_vtx(x,y,z), #fh04
+    #partial derivatives (arguement order matters)
+    # wrt x
+        fh_dvtxx(x,y,z), #fh05
+        fh_dvtx(x,a,z), #fh06
+        fh_dvtx(x,y,a), #fh07
+        fh_dvtx(x,y,z), #fh08
+    # wrt y
+        fh_dvtx(y,z,a), #fh09
+        fh_dvtxx(y,x,z), #fh10
+        fh_dvtx(y,x,a), #fh11
+        fh_dvtx(y,x,z), #fh12
+
+    #wrt z
+        fh_dvtx(z,y,a), #fh13
+        fh_dvtx(z,x,a), #fh14
+        fh_dvtxx(z,x,y), #fh15
+        fh_dvtx(z,x,y), #fh16
+    #
+        fh_fc(y,z,a), #fh17
+        fh_fc(x,z,a), #fh18
+        fh_fc(x,y,a), #fh19
+        fh_fc(x,y,z), #fh20
+    ]
+    return recombine_hermite(CT,vals)
 end

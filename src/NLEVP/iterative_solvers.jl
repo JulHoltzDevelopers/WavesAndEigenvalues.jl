@@ -124,7 +124,7 @@ function mslp(L,z;maxiter=10,tol=0.,relax=1.,lam_tol=Inf,order=1,nev=1,v0=[],v0_
     M=-L.terms[end].coeff
     try
         while  abs(z-z0)>tol   && n<maxiter #&& abs(lam)>lam_tol
-            if output; println(n,"\t\t","\t",abs(z-z0)/scale,"\t", z/scale );flush(stdout); end
+            if output; println(n,"\t\t",abs(z-z0)/scale,"\t", z/scale );flush(stdout); end
 
             L.params[L.eigval]=z
             L.params[L.auxval]=0
@@ -210,7 +210,7 @@ function mslp(L,z;maxiter=10,tol=0.,relax=1.,lam_tol=Inf,order=1,nev=1,v0=[],v0_
     end
     if flag==itsol_converged
         L.params[L.eigval]=z
-        if output;  println(n,"\t\t",abs(lam),"\t",abs(z-z0),"\t", z ); end
+        if output;  println(n,"\t\t",abs(z-z0)/scale,"\t", z/scale ); end
 
 
         if n>=maxiter
@@ -264,7 +264,7 @@ Deploy inverse iteration for finding an eigenpair of `L`.
 - `tol=0`: Absolute tolerance to trigger the stopping of the iteration. If the difference of two consecutive iterates is `abs(z0-z1)<tol` the iteration is aborted.
 - `relax=1`: relaxation parameter
 - `x0::Vector`: initial guess for eigenvector. If not provided it is all ones.
-- `v0::Vector`: normalization vector. If not provided it is all ones.
+- `v::Vector`: normalization vector. If not provided it is all ones.
 - `output::Bool`: Toggle printing online information.
 
 # Returns

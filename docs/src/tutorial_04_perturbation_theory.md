@@ -17,7 +17,7 @@ You can find a comprehensive presentation of the internal algorithms in
 
 !!! note
     The following example uses perturbation theory up to 30th order. Per default
-    WavesAndEigenvalues.jl is build to run perturbation theory to 16th order. You
+    WavesAndEigenvalues.jl is built to run perturbation theory to 16th order. You
     can reconfigure your installation for higher orders by setting an environment
     variable and then rebuild the package. For instance this tutorial requires
     `ENV["JULIA_WAE_PERT_ORDER"]=30` for setting the variable and a subsequent
@@ -124,8 +124,8 @@ sol.eigval_pert
 ```
 
 ```
-Dict{Symbol,Any} with 1 entry:
-  Symbol("τ/Taylor") => Complex{Float64}[1075.33+372.102im, -2.62868e5+3.40796e5im, -1.79944e8-1.475e8im, 9.4741e10-1.57309e11im, 1.66943e14+8.14274e13im, -8.3483e16+1.86246e17im, -2.15622e20-9.17653e19im, 1.05357e23-2.58704e23im, 3.19354e26+1.25588e26im, -1.54315e29+4.02817e29im, -5.16822e32-1.94111e32im, 2.48748e35-6.72431e35im, 8.85193e38+3.23647e38im, -4.26474e41+1.17688e42im, -1.57803e45-5.68031e44im, 7.63541e47-2.13155e48im, 2.89779e51+1.0345e51im, -1.41133e54+3.9619e54im, -5.44414e57-1.93716e57im, 2.67322e60-7.51468e60im, 1.04148e64+3.70668e63im]
+Dict{Symbol, Any} with 1 entry:
+  Symbol("τ/Taylor") => ComplexF64[1075.33+372.102im, -2.62868e5+3.40796e5im, -1.79944e8-1.475e8im, 9.4741e10-1.57309e11im, 1.66943e14+8.14274e13im, -8.3483e16+1.86246e17im, -2.15622e20-9.17653e19im, 1.05357e23-2.58704e23im, 3.19354e26+1.25588e26im, -1.54315e29+4.02817e29im, -5.16822e32-1.94111e32im, 2.48748e35-6.72431e35im, 8.85193e38+3.23647e38im, -4.26474e41+1.17688e42im, -1.57803e45-5.68031e44im, 7.63541e47-2.13155e48im, 2.89779e51+1.0345e51im, -1.41133e54+3.9619e54im, -5.44414e57-1.93716e57im, 2.67322e60-7.51468e60im, 1.04148e64+3.70668e63im]
 ```
 
 We can use these values to form the Taylor-series approximation and for
@@ -155,11 +155,11 @@ println(" exact=$(ω_exact/2/pi)  vs  approx=$(ω_approx/2/pi))")
 Launching MSLP solver...
 Iter   dz:     z:
 ----------------------------------
-0			Inf	916.7085040155473 + 494.3258317478708im
-1			0.006009923194378605	916.7036137652204 + 494.32932526022125im
-2			2.5654097406043415e-8	916.7036137579167 + 494.3293252848137im
-3			1.622588396708824e-11	916.7036137579236 + 494.329325284799im
-4		5.804108531973829e-9	2.157056083093525e-12	916.7036137579256 + 494.32932528479967im
+0		Inf	916.7085040155473 + 494.3258317478708im
+1		0.006009923194378605	916.7036137652204 + 494.32932526022125im
+2		2.5654097406043415e-8	916.7036137579167 + 494.3293252848137im
+3		1.622588396708824e-11	916.7036137579236 + 494.329325284799im
+4		2.157056083093525e-12	916.7036137579256 + 494.32932528479967im
 Solution has converged!
 ...finished MSLP!
 #####################
@@ -173,7 +173,7 @@ Eigenvalue:916.7036137579256 + 494.32932528479967im
 
 ```
 
-Clearly, the approximation matches the first 4 digits after the point!
+Clearly, the approximation matches the first 4 digits after the decimal!
 
 We can also compute the approximation at any lower order than 20.
 For instance, the first-order approximation is:
@@ -238,7 +238,7 @@ r=conv_radius(sol,:τ)
 ```
 
 ```
-30-element Array{Float64,1}:
+30-element Vector{Float64}:
  0.0026438071359421856
  0.0018498027477203886
  0.0012670310435927681
@@ -305,15 +305,15 @@ println(" exact=$(ω_exact/2/pi)  vs  approx=$(ω_approx/2/pi))")
 Launching MSLP solver...
 Iter   dz:     z:
 ----------------------------------
-0			Inf	8.879592083136003e6 - 1.1737122716657885e6im
-1			4.0600651883038566e6	4.870901607915898e6 - 529872.223861651im
-2			1.682178480929161e6	3.225729888267407e6 - 178967.03072543198im
-3			437944.1873905101	2.8166148076510336e6 - 22698.153205330833im
-4			34045.990823039225	2.7910564230047897e6 - 205.96644198751892im
-5			207.55279886998233	2.7910300114278947e6 - 0.1009691061235003im
-6			0.012185956885981062	2.791030020923184e6 - 0.1086069737550432im
-7			4.672416133789498e-10	2.7910300209231847e6 - 0.10860697371664671im
-8		0.0011653820248254138	2.2028212587343887e-13	2.7910300209231847e6 - 0.10860697371686699im
+0		Inf	8.879592083136003e6 - 1.1737122716657885e6im
+1		4.0600651883038566e6	4.870901607915898e6 - 529872.223861651im
+2		1.682178480929161e6	3.225729888267407e6 - 178967.03072543198im
+3		437944.1873905101	2.8166148076510336e6 - 22698.153205330833im
+4		34045.990823039225	2.7910564230047897e6 - 205.96644198751892im
+5		207.55279886998233	2.7910300114278947e6 - 0.1009691061235003im
+6		0.012185956885981062	2.791030020923184e6 - 0.1086069737550432im
+7		4.672416133789498e-10	2.7910300209231847e6 - 0.10860697371664671im
+8		2.2028212587343887e-13	2.7910300209231847e6 - 0.10860697371686699im
 Solution has converged!
 ...finished MSLP!
 #####################
@@ -375,7 +375,7 @@ demand that the truncated Taylor series expansion of our Padé approximant is
 identical to the approximation of our unknown function. Here comes the clou:
 we already know these values because we computed the Taylor-series
 coefficients. Only little algebra is needed to convert the Taylor coefficients
-to Padé coefficients and all of this is build in to the solution type. All you
+to Padé coefficients and all of this is built in to the solution type. All you
 need to know is that the number of Padé coefficients is related to the number
 of Taylor coefficients by the simple formula L+M=N. Let's give it a try and
 compute the Padé approximant for L=M=10 (a so-called diagonal Padé
@@ -393,9 +393,9 @@ println(" exact=$(ω_exact/2/pi)  vs  approx=$(ω_approx/2/pi))")
 Launching MSLP solver...
 Iter   dz:     z:
 ----------------------------------
-0			Inf	668.5373997804821 + 529.4636751544649im
-1			4.96034674936746e-7	668.537399929806 + 529.4636746814398im
-2		1.1965642295134598e-8	4.1740258326821776e-12	668.537399929804 + 529.4636746814361im
+0		Inf	668.5373997804821 + 529.4636751544649im
+1		4.96034674936746e-7	668.537399929806 + 529.4636746814398im
+2		4.1740258326821776e-12	668.537399929804 + 529.4636746814361im
 Solution has converged!
 ...finished MSLP!
 #####################

@@ -25,6 +25,7 @@ makedocs(format = Documenter.HTML(
                         "tutorial_06_second_order_elements.md",
                         "tutorial_07_Bloch_periodicity.md",
                         "tutorial_08_custom_FTF.md",
+                        "tutorial_09_forcing.md",
                         ],
         "API" => Any["NLEVP.md","Meshutils.md", "Helmholtz.md"]
         ]

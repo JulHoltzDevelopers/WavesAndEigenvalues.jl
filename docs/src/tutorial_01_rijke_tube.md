@@ -10,7 +10,8 @@ walk you through the basic steps of setting up a Rijke tube in a
 Helmholtz-solver stability analysis.
 
 !!! note
-    To do this tutorial yourself you will need the `"Rijke_mm.msh`" file.
+    The tutorial reproduces the validation case found in [1].
+    To run it yourself you will need the `"Rijke_mm.msh`" file.
     Download it [here](Rijke_mm.msh).
 
 ## The Helmholtz equation
@@ -314,6 +315,10 @@ all basic steps that are needed to work with the Helmholtz solver. However,
 there are a lot of details you can fine tune and even features that weren't
 mentioned in this tutorial. The next tutorials will introduce these aspects in
 more detail.
+
+## References
+
+[1] F. Nicoud, L. Benoit, and C. Sensiau, Acoustic Modes in Combustors with Complex Impedances and Multidimensional Active Flames, AIAA, 2007, [doi:10.2514/1.24933](https://doi.org/10.2514/1.24933)
 
 ---
 

@@ -4,10 +4,6 @@ EditURL = "<unknown>/tutorial_08_custom_FTF.jl"
 
 # Tutorial 08 Custom FTF
 
-!!! warning
-    This tutorial is still under construction. We are publishing updated versions
-    of our code and more tutorials every now and then. So stay tuned.
-
 The typical use case for thermoacoustic stability assessment will require
 case-speicific data. e.g, measured impedance functions or flame transfer
 functions. This tutorial explains how to specify custom functions in order to
@@ -36,7 +32,7 @@ end
 Of course, it is sometimes hard to find a closed-form expression for an FTF
 and all its derivatives. You need to specify at least these derivative orders
 that will be used by the methods applied to analyse the model. This is at
-least the first order derivative for beyn and the standard mslp method.
+least the first order derivative for the standard mslp method.
 You might return derivative orders up to the order you need it using an if
 clause for each order. Anyway, the function may get complicated. The implicit
 method explained further below is then a viable alternative.
@@ -54,7 +50,7 @@ function FTF(z::Symbol)::String
 end
 ```
 
-Now let's set-up the Rijke tube model. The data is the same as in tutorial 1
+Now let's set-up the Rijke tube model. The data is the same as in Tutorial 01
 
 ```@example tutorial_08_custom_FTF
 using WavesAndEigenvalues.Helmholtz
@@ -95,14 +91,14 @@ dscrp["Flame"]=(:flame,(γ,ρ,Q02U0,x_ref,n_ref,FTF)); #flame dynamics
 L=discretize(mesh,dscrp,c)
 ```
 
-and done! Note how the function is currectly displayed as "natu(ω)"  if we
+and done! Note how the function is correctly displayed as "natu(ω)"  if we
 wouldn't have named it, the FTF will be displayed as `"FTF(ω)"`
 in the signature of the operator.
 
 ## Checking the model
 
 Solving the problem shows that we get the same result as with the built-in
-n-τ-model in Tutorial 1
+n-τ-model in Tutorial 01
 
 ```@example tutorial_08_custom_FTF
 sol,nn,flag=mslp(L,340,maxiter=20,tol=1E-9,scale=2*pi)
@@ -117,7 +113,7 @@ For instance, you can completely deactivate the FTF by setting n to 0.
 n=0
 ```
 
-Indeed the model now converges to purely acoustic mode
+Indeed the model now converges to a purely acoustic mode
 
 ```@example tutorial_08_custom_FTF
 sol,nn,flag=mslp(L,340*2*pi,maxiter=20,tol=1E-11)
@@ -135,15 +131,15 @@ rules.
 # Something else than n-τ...
 ```
 
-Of course this is an academic example. In practice you will specify
+Of course, this is an academic example. In practice you will specify
 something very custom as FTF. Maybe a superposition of σ-τ-models or even
 a statespace model fitted to experimental data.
 
-A faily generic way of handling was intoduced in [1]. This approach is not
+A fairly generic way of handling experimental FTFs was intoduced in [1]. This approach is not
 considering a specific FTF but parametrizes the problem in terms of the flame
-response. Using perturbation theory it is than possible to get the
-frequency as a function of the flame response. Closing the system with a
-specific FTF is than possible, and the eigenfrequency is found by solving a
+response. Using perturbation theory, it is then possible to get the
+frequency as a function of the flame response. This allows for closing the system with a
+specific FTF in a subsequent step and, hence,  finding the eigenfrequency by solving a
 scalar equation! Here is a demonstration on how that works:
 
 ```@example tutorial_08_custom_FTF
@@ -172,9 +168,9 @@ func=pade(Polynomial(sol_base.eigval_pert[Symbol("FTF/Taylor")]),8,8)
 ## Newton-Raphson for finding flame response
 
 Now, we can deploy a simple Newton-Raphson iteration for finding the eigenfrequency
-for a chosen FTF as a postprocessing step. This is possible, because we have a good
+for a chosen FTF as a postprocessing step. This is possible because we have a good
 approximation of ``\omega`` as a function of the flame response ``\eta`` and a FTF
-would link ``\omega``to a flame response. Hence, the eigenfrequency of the problem
+would link ``\omega`` to a flame response. Hence, the eigenfrequency of the problem
 is implicitly given by the scalar (sic!) equation:
 ```math
 \eta = FTF(\omega(\Delta\eta))-\eta_0
@@ -205,6 +201,20 @@ println(" exact=$(ω_exact/2/pi)  vs  approx=$(ω(η)/2pi))")
 ```
 
 Works like a charm!
+
+## Summary
+
+You can analytically define custom FTFs. In order, for high-order perturbation theory to
+work, you will need to specify high order derivatives of your custom function, too.
+Sometimes this is cumbersome. As an alternative, you can first solve the problem
+parametrized in the flame response only and then closing the problem in a subsequent
+step using a custom FTF of which only the first derivative is known and a
+Newton-Raphson-Iteration.
+
+## References
+[1] C. F. Silva,  L. Prieto,  M. Ancharek,  P. Marigliani, and  G. A. Mensah,
+Adjoint-Based Calculation of Parametric Thermoacoustic Maps of an Industrial Combustion Chamber,
+JEGTP, GTP-20-1520, [doi:10.1115/1.4049295]( https://doi.org/10.1115/1.4049295)
 
 ---
 

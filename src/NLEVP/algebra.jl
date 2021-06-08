@@ -60,7 +60,22 @@ function pow(z::ComplexF64,k::Int64,a::Int64)::ComplexF64
   return f
 end
 
-function pow_a(a::Int64)
+function pow(z::ComplexF64,k::Int64,a::Number)::ComplexF64
+  if k>=0
+    f=1
+    i=a
+    for j=0:k-1
+      f*=i
+      i-=1
+    end
+    f*=z^(a-k)
+  else
+    f=complex(NaN)
+  end
+  return f
+end
+
+function pow_a(a::Number)
 
   function f(z::ComplexF64,k::Int64=0)::ComplexF64
     let a=a

@@ -376,7 +376,21 @@ function (-)(b::Term,a::LinearOperatorFamily)
 end
 
 
+import Base.size
+"""
+  d=size(L::LinearOperatorFamily)
 
+Get dimension `d` of `d×d` linear operator family `L`.
+"""
+function size(L::LinearOperatorFamily)
+  if length(L.terms)!=0
+    shape=size(L.terms[1].coeff)
+  else
+    shape=(0,0)
+  end
+
+  return shape[1]
+end
 
 #nice display of LinearOperatorFamilies in interactive and other modes
 import Base.show

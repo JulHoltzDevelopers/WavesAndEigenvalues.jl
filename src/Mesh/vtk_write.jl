@@ -30,25 +30,17 @@ function vtk_write1(file_name::String,mesh::Mesh,data=[],binary=true,compressed=
       # end
       # write(fid,"</DataArray>\n")
       N_points=size(mesh.points,2)
-      if N_points <2^16
-         connectivity=Array{UInt16}(undef,length(mesh.tetrahedra)*4)
-         idx=1
-         for tet in mesh.tetrahedra
-            for pnt_idx in tet
-               connectivity[idx]=UInt16(pnt_idx-1)
-               idx+=1
-            end
-         end
-      else
-         connectivity=Array{UInt32}(undef,length(mesh.tetrahedra)*4)
-         idx=1
-         for tet in mesh.tetrahedra
-            for pnt_idx in tet
-               connectivity[idx]=UInt32(pnt_idx-1)
-               idx+=1
-            end
+      #connectivioty must be Int32. Paraview is serious about this in its latest
+      #versions! https://discourse.paraview.org/t/cannot-open-vtu-files-with-paraview-5-8/3759
+      connectivity=Array{Int32}(undef,length(mesh.tetrahedra)*4)
+      idx=1
+      for tet in mesh.tetrahedra
+         for pnt_idx in tet
+            connectivity[idx]=Int32(pnt_idx-1)
+            idx+=1
          end
       end
+
       write_data_array(fid,Dict("connectivity"=>connectivity),binary,compressed)
 
       write(fid,"\t\t\t\t<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">")

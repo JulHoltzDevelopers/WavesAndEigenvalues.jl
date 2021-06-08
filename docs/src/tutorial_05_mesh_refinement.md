@@ -5,8 +5,8 @@ EditURL = "<unknown>/tutorial_05_mesh_refinement.jl"
 # Tutorial 05 Mesh Refinement
 
 ## Intro
-This tutorial explains you to utilities for performing mesh-refinement.
-The main function here is `finer_mesh=octosplit(mesh)`, which splits all
+This tutorial introduces you to utilities for performing mesh-refinement.
+The main comand here is `finer_mesh=octosplit(mesh)`, which splits all
 tetrahedral cells in `mesh` by bisecting each edge. This will lead to a
 subdivision of each tetrahedron into eight new tetrahedra. Such a division is
 not unique. There are three ways of splitting a tetrahedron into eight new
